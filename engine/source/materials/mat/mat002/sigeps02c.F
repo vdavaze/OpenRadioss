@@ -124,7 +124,6 @@ C-----------------------------------------------
         EPDR(I) = MAX( EM20, PM(44,IMAT)*DT1C(I) )        
         NPIF      = NPIF + IRTY
         T(I)      = TI
-        PLAP(I)   = ZERO
       ENDDO
       IF(VP == 1) THEN
         DO I=JFT,JLT          
@@ -146,7 +145,7 @@ C-----------------------------------------------
       ENDIF
       IF (VP == 3) THEN
         IF (ISRATE > 0) THEN 
-          DO I=JFT,JLT
+        DO I=JFT,JLT
             DAV    = (EPSPXX(I)+EPSPYY(I))*THIRD
             DEVE1  = EPSPXX(I) - DAV
             DEVE2  = EPSPYY(I) - DAV
@@ -156,7 +155,7 @@ C-----------------------------------------------
             EPSDOT(I)   = SQRT(THREE*EPSDOT(I))/THREE_HALF             
             EPSDOT(I)   = ASRATE*EPSDOT(I) + (ONE - ASRATE)*UVAR(I,1)
             UVAR(I,1)   = EPSDOT(I)
-          ENDDO
+        ENDDO
         ELSEIF (ISRATE == 0) THEN
           DO I=JFT,JLT
              DAV = (EPSPXX(I)+EPSPYY(I))*THIRD
@@ -172,7 +171,7 @@ C-----------------------------------------------
       ELSE
         DO I=JFT,JLT  
          EPSDOT(I)  = EPSPDT(I)    
-        ENDDO     
+        ENDDO 
       ENDIF
 !----------------------------
 !         CONTRAINTES PLASTIQUEMENT ADMISSIBLES
@@ -188,11 +187,11 @@ C-----------------------------------------------
      9            DEPSYZ  ,DEPSZX  ,SIGNXX   ,SIGNYY   ,SIGNXY  ,
      A            SIGNYZ  ,SIGNZX  ,SIGBAKXX ,SIGBAKYY ,SIGBAKXY,
      B            SIGOXX  ,SIGOYY  ,SIGOXY   ,SIGOYZ   ,SIGOZX  ,
-     C            VP      ,PLAP    ,DT1C     ,ASRATE)
+     C            VP      )
 !
-      IF(VP == 1) THEN
+      IF (VP == 1) THEN
         DO I=JFT,JLT
-          UVAR(I,1) = PLAP(I) 
+          UVAR(I,1) = DPLA(I)/DT1C(I)
         ENDDO
       ENDIF
 

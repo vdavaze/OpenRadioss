@@ -36,7 +36,7 @@ Copyright>        commercial version may interest you: https://www.altair.com/ra
      9                  DEPSYZ ,DEPSZX ,SIGNXX   ,SIGNYY   ,SIGNXY  ,
      A                  SIGNYZ ,SIGNZX ,SIGBAKXX ,SIGBAKYY ,SIGBAKXY,
      B                  SIGOXX ,SIGOYY ,SIGOXY   ,SIGOYZ   ,SIGOZX  ,
-     C                  VP     ,PLAP   ,TIMESTEP,ASRATE)
+     C                  VP     )
 C---+----1----+----2----+----3----+----4----+----5----+----6----+----7--
 C-----------------------------------------------
 C   I m p l i c i t   T y p e s
@@ -56,8 +56,6 @@ C-----------------------------------------------
       INTEGER JFT, JLT, IPLA,NPIF,IRTY,ISRATE,NEL
       INTEGER,INTENT(IN) :: VP
 C     REAL
-      my_real ,DIMENSION(NEL)   ,INTENT(INOUT) :: PLAP
-      my_real ,INTENT(IN) :: TIMESTEP,ASRATE
       my_real
      .   EZZ(*), OFF(*), EPSEQ(*),T(*),Z3,Z4,
      .   EPIF, ETSE(*),GS(*),EPSP(*)
@@ -135,22 +133,16 @@ C     STRAIN RATE (JOHNSON-COOK, ZERILLI-ARMSTRONG)
 C-------------
       IF (EPIF /= ZERO) THEN
         IF (NPIF == ZERO) THEN      
-          IF (VP == 1)THEN
-            DO I=JFT,JLT
-              IF(PLAP(I) >EPDR(I)) LOGEP(I) = LOG(PLAP(I)/EPDR(I))
-            ENDDO
-          ELSE
-            DO I=JFT,JLT
-              IF (ISRATE == 0.AND.VP == 2) EPSP(I) = 
-     .           MAX( ABS(DEPSXX(I)), ABS(DEPSYY(I)), HALF*ABS(DEPSXY(I)))
-              EPSP(I)  = MAX(EPSP(I),EPDR(I))
-              LOGEP(I) = LOG(EPSP(I)/EPDR(I))
-            ENDDO
-          ENDIF
-#include "vectorize.inc" 
           DO I=JFT,JLT
-            MT=MAX(EM20,Z3)
-            IF (TSTAR(I) == ZERO) THEN
+            IF (ISRATE == 0.AND.VP == 2) EPSP(I) = 
+     .           MAX( ABS(DEPSXX(I)), ABS(DEPSYY(I)), HALF*ABS(DEPSXY(I)))
+            EPSP(I)  = MAX(EPSP(I),EPDR(I))
+            LOGEP(I) = LOG(EPSP(I)/EPDR(I))
+          ENDDO
+#include "vectorize.inc" 
+            DO I=JFT,JLT
+              MT=MAX(EM20,Z3)
+              IF (TSTAR(I) == ZERO) THEN
               Q(I) = (ONE + CC * LOGEP(I))
             ELSE
               Q(I) = (ONE + CC * LOGEP(I))*(ONE-EXP(MT*LOG(TSTAR(I))))             
@@ -161,18 +153,12 @@ C-------------
             IF (ICC == 1) YMAX(I) = YMAX(I) * Q(I)
           ENDDO
         ELSEIF (NPIF == JLT) THEN
-          IF(VP==1)THEN
-            DO I=JFT,JLT
-              IF(PLAP(I) >EPDR(I))LOGEP(I) = LOG(PLAP(I)/EPDR(I))
-            ENDDO
-          ELSE
-            DO I=JFT,JLT
-              IF (ISRATE == 0.AND.VP == 2) EPSP(I) = MAX( ABS(DEPSXX(I)),
+          DO I=JFT,JLT
+            IF (ISRATE == 0.AND.VP == 2) EPSP(I) = MAX( ABS(DEPSXX(I)),
      .                   ABS(DEPSYY(I)), HALF*ABS(DEPSXY(I)))
-              EPSP(I) = MAX(EPSP(I),EM20)
-              LOGEP(I) = LOG(EPSP(I)/EPDR(I))
-            ENDDO
-          ENDIF
+            EPSP(I) = MAX(EPSP(I),EM20)
+            LOGEP(I) = LOG(EPSP(I)/EPDR(I))
+          ENDDO
           DO I=JFT,JLT
             Q(I) = LOGEP(I)! LOG(EPSP(I)/EPDR(I))
             Q(I)= CC*EXP((-Z3+Z4 * Q(I))*T(I))
@@ -182,14 +168,10 @@ C-------------
         ELSE
           DO I=JFT,JLT
             IF (IRTY == 0) THEN
-              IF(VP==1)THEN
-                IF(PLAP(I) >EPDR(I))LOGEP(I) = LOG(PLAP(I)/EPDR(I))
-              ELSE
-                IF (ISRATE == 0.AND.VP == 2) EPSP(I) = 
+              IF (ISRATE == 0.AND.VP == 2) EPSP(I) = 
      .          MAX( ABS(DEPSXX(I)), ABS(DEPSYY(I)), HALF*ABS(DEPSXY(I)))
-                EPSP(I) = MAX(EPSP(I),EPDR(I))
-                LOGEP(I) = LOG(EPSP(I)/EPDR(I))
-              ENDIF
+              EPSP(I) = MAX(EPSP(I),EPDR(I))
+              LOGEP(I) = LOG(EPSP(I)/EPDR(I))
               MT=MAX(EM20,Z3)
               IF (TSTAR(I) == ZERO) THEN
                 Q(I) = (ONE + CC * LOGEP(I))
@@ -201,15 +183,10 @@ C-------------
               CB(I) = CB(I) * Q(I)
               IF (ICC == 1) YMAX(I) = YMAX(I) * Q(I)
             ELSE
-              IF(VP==1)THEN
-                IF(PLAP(I) >EPDR(I))LOGEP(I) = LOG(PLAP(I)/EPDR(I))
-              ELSE
-                IF (ISRATE == 0 .AND.VP == 2) EPSP(I) = MAX( ABS(DEPSXX(I)), 
+              IF (ISRATE == 0 .AND.VP == 2) EPSP(I) = MAX( ABS(DEPSXX(I)), 
      .                    ABS(DEPSYY(I)), HALF*ABS(DEPSXY(I)))
-                EPSP(I)  = MAX(EPSP(I),EM20)
-                LOGEP(I) = LOG(EPSP(I)/EPDR(I))
-              ENDIF
-
+              EPSP(I)  = MAX(EPSP(I),EM20)
+              LOGEP(I) = LOG(EPSP(I)/EPDR(I))
               Q(I) = LOGEP(I)  
               Q(I) = CC*EXP((-Z3+Z4 * Q(I))*T(I))
               IF (ICC == 1) YMAX(I)= YMAX(I) + Q(I)
@@ -536,15 +513,6 @@ C
         ENDDO
 
       END IF !(IKFLG > 0) THEN
-C--------------------------------------------
-c  update and filter plastic strain rate
-C--------------------------------------------
-      IF (VP == 1) THEN 
-        DO I=JFT,JLT
-          PLAP1   = DPLA(I) / MAX(EM20,TIMESTEP)
-          PLAP(I) = ASRATE * PLAP1 + (ONE - ASRATE) * PLAP(I)
-        ENDDO
-      ENDIF
 C
 C--------------------------------
 C     HARDENING MODULUS
