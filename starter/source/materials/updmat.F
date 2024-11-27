@@ -76,6 +76,7 @@ C-----------------------------------------------
       USE SENSOR_MOD
       USE LAW50_UPD_MOD  
       USE LAW19_UPD_MOD  
+      USE LAW129_UPD_MOD
       USE LAW190_UPD_MOD  
       USE VISC_PARAM_MOD
       USE NAMES_AND_TITLES_MOD , ONLY : NCHARTITLE
@@ -380,7 +381,10 @@ c------------------
      .                      UPARAM,PM(1,IMAT),TITR    ,MAT_ID )          
 c------------------
           CASE (120)    ! TAPO material for adhesives
-            CALL LAW120_UPD(NPARAM ,NUMTABL ,ITABLE ,TABLE ,UPARAM)          
+            CALL LAW120_UPD(NPARAM ,NUMTABL ,ITABLE ,TABLE ,UPARAM)      
+c------------------
+          CASE (129)    ! BARLAT3_EXTENDED material 
+            CALL LAW129_UPD(MAT_ID  ,TITR    ,MATPARAM,TABLE   ,NTABLE  )      
 c-------------------------
           CASE (158) 
             NFUNCL =  IPM(6,IMAT)

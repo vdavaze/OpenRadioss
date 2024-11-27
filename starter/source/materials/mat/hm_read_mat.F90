@@ -48,6 +48,7 @@ subroutine hm_read_mat(                                                   &
       use hm_read_mat125_mod
       use hm_read_mat126_mod
       use hm_read_mat127_mod
+      use hm_read_mat129_mod
       use names_and_titles_mod , only : nchartitle, ncharline
       use reader_old_mod , only : key0
       use multimat_param_mod , only : m51_ssp0max, m51_lc0max, m51_tcp_ref, m51_lset_iflg6, m20_discrete_fill
@@ -1023,6 +1024,13 @@ subroutine hm_read_mat(                                                   &
             &nfunc    ,ifunc    ,mtag     ,parmat   ,unitab   ,&
             &pm(1,i)  ,lsubmodel,israte   ,mat_id   ,titr     ,&
             &matparam ,nvartmp  )
+!-------            
+          case ('LAW129','BARLAT3_EXTENDED')
+            ilaw = 129
+            call hm_read_mat129(&
+            &nuvar    ,npropm   ,iout     ,mtag    ,parmat   ,unitab   ,&
+            &pm(1,i)  ,lsubmodel,israte   ,mat_id  ,titr     ,matparam ,&
+            &nvartmp  )
 !-------
           case ('LAW151','MULTIFLUID')
             ilaw  = 151

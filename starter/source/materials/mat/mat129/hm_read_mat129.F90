@@ -62,7 +62,7 @@
 !-----------------------------------------------
       integer :: tab_lch00,tab_lch45,tab_lch90,tab_lchbi,tab_lchsh,ilaw
       integer :: tab_lcr00,tab_lcr45,tab_lcr90,tab_lcrbi,tab_lcrsh
-      my_real :: hosf,mexp,nu,rho0,young,a11,a12,bulk,asrate
+      my_real :: hosf,mexp,nu,rho0,young,a11,a12,bulk,asrate,g
       logical :: is_available,is_encrypted
 !=======================================================================
       is_encrypted = .false.
@@ -98,6 +98,7 @@
       bulk = young/(three*(one-two*nu))
       a11  = young/(one-nu*nu)
       a12  = nu*a11
+      g    = young/(three*(one-two*nu))
       ! Default exponent
       if (mexp == zero) mexp = six
       ! Default strain rate filtering frequency
@@ -116,13 +117,13 @@
       ! Number of integer material parameters
       matparam%niparam = 0
       ! Number of real material parameters
-      matparam%nuparam = 6
+      matparam%nuparam = 7
       ! Number of table material parameters
-      matparam%ntable = 10 
+      matparam%ntable  = 10 
       ! Number of user variables 
       nuvar = 0
       ! Number of temporary variables
-      nvartmp = 0
+      nvartmp = 10
 !          
       ! Allocation of material parameters tables
       allocate(matparam%iparam(matparam%niparam))
@@ -134,8 +135,9 @@
       matparam%uparam(2) = nu
       matparam%uparam(3) = a11
       matparam%uparam(4) = a12
-      matparam%uparam(5) = hosf
-      matparam%uparam(6) = mexp
+      matparam%uparam(5) = g
+      matparam%uparam(6) = hosf
+      matparam%uparam(7) = mexp
 ! 
       ! Table material parameters
       matparam%table( 1)%notable = tab_lch00  
@@ -194,9 +196,9 @@
         5X,'MATERIAL NUMBER. . . . . . . . . . . . . . .=',I10/,      &
         5X,'MATERIAL LAW . . . . . . . . . . . . . . . .=',I10/)
  1000 format(/                                                        &
-        5X,'-------------------------------------------',/            &
-        5X,'MATERIAL MODEL: EXTENDED 3 PARAMETER BARLAT',/,           &
-        5X,'-------------------------------------------',/)
+        5X,'---------------------------------------------',/          &
+        5X,'MATERIAL MODEL: EXTENDED 3 PARAMETERS BARLAT ',/,         &
+        5X,'---------------------------------------------',/)
  1100 format(/                                                        &
         5X,'INITIAL DENSITY. . . . . . . . . . . . . . .=',1PG20.13/)  
  1200 format(/                                                        &

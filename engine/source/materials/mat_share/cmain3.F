@@ -155,7 +155,7 @@ C-----------------------------------------------
      .   F_DEF(MVSIZ,*),ALDT(MVSIZ),VARNL(NEL,*)
       my_real, DIMENSION(NEL), INTENT(IN) :: THKE
       my_real, dimension(mvsiz), intent(inout) :: fheat
-      TYPE (TTABLE) TABLE(*)
+      TYPE (TTABLE) TABLE(NTABLE)
       TYPE (ELBUF_STRUCT_), TARGET :: ELBUF_STR
       TYPE (STACK_PLY) :: STACK
       TYPE (FAILWAVE_STR_) ,TARGET :: FAILWAVE 
@@ -316,7 +316,7 @@ c
      8       SHF     ,GS      ,SIGY    ,THK0    ,EPSP    ,
      9       POSLY   ,IGEO    ,IPM     ,FAILWAVE,FWAVE_EL,
      A       IFAILURE,ALDT    ,TEMPEL  ,DIE     ,FHEAT   ,
-     B       TABLE   ,IXFEM   ,ELCRKINI,
+     B       TABLE   ,NTABLE  ,IXFEM   ,ELCRKINI,
      D       SENSORS ,NG      ,IDT_THERM,THEACCFACT,  
      E       DIR1_CRK,DIR2_CRK,IPARG   ,JHBE    ,ISMSTR  ,JTHE    ,
      F       TENS    ,IR      ,IS      ,NLAY    ,NPT     ,IXLAY   ,

@@ -34,7 +34,7 @@ subroutine mulawc(elbuf_str ,&
    & shf      ,gs       ,sigy     ,thk0      ,epsp     ,           &
    & posly    ,igeo     ,ipm      ,failwave  ,fwave_el ,           &
    & ifailure ,aldt     ,tempel   ,die       ,fheat    ,           &
-   & table     ,ixfem   ,elcrkini ,                                &
+   & table    ,ntable   ,ixfem    ,elcrkini  ,                     &
    & sensors  ,ng       ,idt_therm,theaccfact,                     &
    & dir1_crk ,dir2_crk ,iparg    ,jhbe      ,ismstr   ,jthe     , &
    & tensx    ,ir       ,is       ,nlay      ,npt      ,ixlay    , &
@@ -59,6 +59,7 @@ subroutine mulawc(elbuf_str ,&
       use sensor_mod
       use sigeps125c_mod
       use sigeps127c_mod
+      use sigeps129c_mod
       use elbufdef_mod
       use dt_mod
       use file_descriptor_mod
@@ -68,7 +69,7 @@ subroutine mulawc(elbuf_str ,&
 ! ----------------------------------------------------------------------------------------------------------------------
       implicit none
 #include "my_real.inc"
-#include      "comlock.inc"
+#include "comlock.inc"
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Arguments
 ! ----------------------------------------------------------------------------------------------------------------------
@@ -83,6 +84,7 @@ subroutine mulawc(elbuf_str ,&
       integer, intent(in) :: ng
       integer, intent(in) :: nlay
       integer, intent(in) :: ismstr
+      integer, intent(in) :: ntable
       integer, intent(in) :: ixfem
       integer, intent(in) :: ifailure
       integer, intent(in) :: jhbe
@@ -243,7 +245,7 @@ subroutine mulawc(elbuf_str ,&
       &el_pla
       target :: tempel,bufmat,scale1
 !----
-      type(ttable) table(*)
+      type(ttable) table(ntable)
       type(ulawcintbuf) :: userbuf
       type(buf_lay_) ,pointer :: bufly
       type(l_bufel_) ,pointer :: lbuf
@@ -1706,6 +1708,26 @@ subroutine mulawc(elbuf_str ,&
                &signxx   ,signyy     ,signxy   ,signzx   ,signyz   ,&
                &off      ,sigy       ,etse     ,ssp      ,lbuf%dmg ,&
                gbuf%dmg)
+!
+            elseif (ilaw == 129) then
+               ! ---
+               do i=jft,jlt
+                  ! ij(k) = nel*(k-1)
+                  sigoxx(i) =  lbuf%sig(nel*(1-1)+i)
+                  sigoyy(i) =  lbuf%sig(nel*(2-1)+i)
+                  sigoxy(i) =  lbuf%sig(nel*(3-1)+i)
+                  sigoyz(i) =  lbuf%sig(nel*(4-1)+i)
+                  sigozx(i) =  lbuf%sig(nel*(5-1)+i)
+               enddo
+               !---
+               call sigeps129c(&
+               &jlt      ,matparam  ,rho      ,thkn     ,thklyl   ,      &
+               &depsxx   ,depsyy    ,depsxy   ,depsyz   ,depszx   ,      &   
+               &sigoxx   ,sigoyy    ,sigoxy   ,sigozx   ,sigoyz   ,      &
+               &signxx   ,signyy    ,signxy   ,signzx   ,signyz   ,      &
+               &off      ,sigy      ,etse     ,ssp      ,gs       ,      &
+               &lbuf%pla ,dpla      ,epsp     ,vartmp   ,nvartmp  ,      &
+               table     ,ntable    )
 !
             elseif (ilaw == 158) then
 
