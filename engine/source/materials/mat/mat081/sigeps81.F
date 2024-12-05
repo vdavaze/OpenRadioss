@@ -121,7 +121,7 @@ C        NPF,TF  : FUNCTION PARAMETER
 C-----------------------------------------------
 C   L o c a l   V a r i a b l e s
 C-----------------------------------------------
-      INTEGER I,NIT,SOFT_FLAG
+      INTEGER I,NIT,SOFT_FLAG,ITER
       INTEGER, PARAMETER :: NITMAX=3
       my_real ALPHA,TGB,TGP,MAX_DILAT,KINI,GINI,YLDINI,CAPINI,DELTA,
      .  DRCDP,DFDP,DFDPB,DFDC,DGDP,HH,DLAMBDA,DWPX2,QX2,DEPSPV,DEPSLV,
@@ -168,34 +168,86 @@ c---------------------
       EPSPD => DEFP(1:NEL,1)   ! Von Mises Equivalent Plastic Strain  
       EPSPV => DEFP(1:NEL,2)   ! Volumetric Plastic Strain
 c---------------------     
-      KINI = UPARAM(1)
-      GINI = UPARAM(2)
-      TGB  = UPARAM(3)
-      TGP  = UPARAM(4)
-      ALPHA= UPARAM(5)
-      MAX_DILAT = UPARAM(6) 
+!
+      !========================================================================
+      ! - INITIALISATION OF COMPUTATION ON TIME STEP
+      !========================================================================
+      !< Recovering integer model parameter
       SOFT_FLAG = INT(UPARAM(7)) 
-C
-      EPSPVOL0 = UPARAM(8)
-      KWATER   = UPARAM(9)
-      POR0     = UPARAM(10)
-      SAT0     = UPARAM(11)  ! sat0=1+mu0 = la saturation initiale quand <1
-      U0       = UPARAM(12)
-      TOLMU    = UPARAM(13)
-      VISCFAC  = UPARAM(14)
-      YLDINI   = UPARAM(15)
-      CAPINI   = UPARAM(16)
-c
-      UNMSPOR0 = ONE-POR0      
-c------------------------------------------------
-c     ATTENTION INITIALISATIONS PROVISOIREMENT ICI
-c     A rendre compatible : IF(EPSPV(I) == ZERO) EPSPV(I)=UPARAM(8)! EPSVINI
+      !< Recovering real model paramter 
+      KINI      = UPARAM(1)
+      GINI      = UPARAM(2)
+      TGB       = UPARAM(3)
+      TGP       = UPARAM(4)
+      ALPHA     = UPARAM(5)
+      MAX_DILAT = UPARAM(6) 
+      EPSPVOL0  = UPARAM(8)
+      KWATER    = UPARAM(9)
+      POR0      = UPARAM(10)
+      SAT0      = UPARAM(11)
+      U0        = UPARAM(12)
+      TOLMU     = UPARAM(13)
+      VISCFAC   = UPARAM(14)
+      YLDINI    = UPARAM(15)
+      CAPINI    = UPARAM(16)
+      UNMSPOR0  = ONE-POR0  
+!
+      !========================================================================
+      ! - RECOVERING ELASTIC PARAMETERS
+      !========================================================================
+      !--> Bulk modulus computation
+      IF (IFUNC(1) > 0) THEN
+        DO I=1,NEL 
+          K(I) = KINI*FINTER(IFUNC(1),EPSPV(I),NPF,TF,DERI)
+        ENDDO
+      ELSE
+        K(1:NEL) = KINI
+      ENDIF
+      !--> Shear modulus computation
+      IF (IFUNC(2) > 0) THEN
+        DO I=1,NEL 
+          G(I) = GINI*FINTER(IFUNC(2),EPSPV(I),NPF,TF,DERI)
+        ENDDO
+      ELSE
+        G(1:NEL) = GINI
+      ENDIF
+      G2(1:NEL) = TWO*G(1:NEL)
+!
+      !========================================================================
+      ! - RECOVERING YIELD CRITERION PARAMETERS
+      !========================================================================
+      !--> Material cohesion
+      IF (IFUNC(3) > 0) THEN 
+        DO I = 1,NEL
+          C(I) = YLDINI*FINTER(IFUNC(3),EPSPD(I),NPF,TF,DCDEPSP(I))
+          C(I) = MAX(C(I), ZERO)
+        ENDDO
+      ELSE
+        C(1:NEL) = YLDINI
+      ENDIF
+      !--> Cap limit pressure
+      IF (IFUNC(4) > 0) THEN
+        DO I = 1,NEL
+          PB(I) = CAPINI*FINTER(IFUNC(4),EPSPV(I),NPF,TF,DPBDEPSP(I))
+        ENDDO
+      ELSE
+        PB(1:NEL) = CAPINI
+      ENDIF
+      PA(1:NEL) = ALPHA*PB(1:NEL)  
+      !--> Transition pressure yield surface to cap
+      DO I = 1,NEL
+        DELTA = (PA(I)*TGB + C(I))**2 + EIGHT*((PB(I)-PA(I))**2)*TGB**2
+        IF (TGB > SMALL) THEN
+          P0(I) = PA(I) + (-(PA(I)*TGB+C(I)) + SQRT(DELTA))/FOUR/TGB
+        ELSE
+          P0(I) = PA(I)
+        ENDIF
+      ENDDO
+!      
+      !< User variables initilization     
       IF (ISIGI == 0) THEN  
         IF (TIME == ZERO) THEN
           DO I=1,NEL
-            IF(EPSPV(I) == ZERO) EPSPV(I)=UPARAM(8)
-            ! -------------------------------------------------------------------------
-            ! Modification (26/05/2020) - V.DAVAZE - for missing scale factors in manual
             IF (IFUNC(3) > 0) THEN 
               C(I) = YLDINI*FINTER(IFUNC(3),EPSPD(I),NPF,TF,DCDEPSP(I))
             ELSE
@@ -207,19 +259,18 @@ c     A rendre compatible : IF(EPSPV(I) == ZERO) EPSPV(I)=UPARAM(8)! EPSVINI
             ELSE
               PB(I) = CAPINI
             ENDIF
-            ! -------------------------------------------------------------------------
-            UVAR(I,1)=C(I)
-            UVAR(I,2)=PB(I)
-            UVAR(I,3)=U0
-            UVAR(I,4)=POR0
-            UVAR(I,5)=SAT0
-            MUW(I)=SAT0-ONE
-            IF(MUW(I) >= TOLMU)THEN
-               UVAR(I,6)=KWATER*MUW(I)
-            ELSEIF(MUW(I) > -TOLMU)THEN
-               UVAR(I,6)=KWATER/FOUR/TOLMU*(MUW(I)+TOLMU)**2
+            UVAR(I,1) = C(I)
+            UVAR(I,2) = PB(I)
+            UVAR(I,3) = U0
+            UVAR(I,4) = POR0
+            UVAR(I,5) = SAT0
+            MUW(I)    = SAT0-ONE
+            IF (MUW(I) >= TOLMU) THEN
+              UVAR(I,6)=KWATER*MUW(I)
+            ELSEIF (MUW(I) > -TOLMU) THEN
+              UVAR(I,6)=KWATER/FOUR/TOLMU*(MUW(I)+TOLMU)**2
             ELSE
-               UVAR(I,6)=ZERO
+              UVAR(I,6)=ZERO
             ENDIF
           ENDDO
         ENDIF
@@ -247,284 +298,293 @@ C
       ENDIF
 c---------------      
       DO I=1,NEL
-        ! -------------------------------------------------------------------------
-        ! Modification (26/05/2020) - V.DAVAZE - for missing scale factors in manual
-        IF (IFUNC(3) > 0) THEN 
-          C(I) = YLDINI*FINTER(IFUNC(3),EPSPD(I),NPF,TF,DCDEPSP(I))
-        ELSE
-          C(I) = YLDINI
-        ENDIF
-        C(I) = MAX(C(I), ZERO)
-        IF (IFUNC(4) > 0) THEN
-          PB(I) = CAPINI*FINTER(IFUNC(4),EPSPV(I),NPF,TF,DPBDEPSP(I))
-        ELSE
-          PB(I) = CAPINI
-        ENDIF
-        ! -------------------------------------------------------------------------
-        PA(I) = ALPHA*PB(I)
-        PBMPA(I) = (PB(I)-PA(I))
-        PBMPA2(I)= PBMPA(I)**2
-        DELTA = (PA(I)*TGB + C(I))**2 + EIGHT*PBMPA2(I)*TGB**2
-        IF (TGB > SMALL) THEN
-          P0(I)=PA(I)+(-(PA(I)*TGB+C(I))+SQRT(DELTA))/FOUR/TGB
-        ELSE
-          P0(I)=PA(I)
-        ENDIF
-        G2(I) = TWO*G(I)
-C
-        DEPSVOL(I) = (DEPSXX(I) +DEPSYY(I) +DEPSZZ(I))
-        DAV(I) = DEPSVOL(I)*THIRD
-        D1(I)  = DEPSXX(I)-DAV(I)
-        D2(I)  = DEPSYY(I)-DAV(I)
-        D3(I)  = DEPSZZ(I)-DAV(I)
-c       Increments elastiques pression et deviateur        
-        DP(I) =-K(I)* DEPSVOL(I)
-        DS1(I)= G2(I)* D1(I) 
-        DS2(I)= G2(I)* D2(I)
-        DS3(I)= G2(I)* D3(I)
-        DS4(I)= G(I) * DEPSXY(I)
-        DS5(I)= G(I) * DEPSYZ(I)
-        DS6(I)= G(I) * DEPSZX(I)
-c       Valeurs elastiques pression et deviateur   
-        PO(I)  =-(SIGOXX(I)+SIGOYY(I)+SIGOZZ(I))*THIRD
-        SO1(I) = SIGOXX(I) + PO(I)
-        SO2(I) = SIGOYY(I) + PO(I)
-        SO3(I) = SIGOZZ(I) + PO(I)
-        SO4(I) = SIGOXY(I)
-        SO5(I) = SIGOYZ(I)
-        SO6(I) = SIGOZX(I)
-
-        S1(I) = SO1(I) + DS1(I)
-        S2(I) = SO2(I) + DS2(I)
-        S3(I) = SO3(I) + DS3(I)
-        S4(I) = SO4(I) + DS4(I)
-        S5(I) = SO5(I) + DS5(I)
-        S6(I) = SO6(I) + DS6(I)
-        P(I)  = PO(I)  + DP(I)
-c       Contraintes elastiques
-        SIGNXX(I) = S1(I)-P(I)
-        SIGNYY(I) = S2(I)-P(I)
-        SIGNZZ(I) = S3(I)-P(I)
-        SIGNXY(I) = S4(I)
-        SIGNYZ(I) = S5(I)
-        SIGNZX(I) = S6(I)
-C
+!      
+        !< Average volumetric strain increment
+        DAV(I) = (DEPSXX(I)+DEPSYY(I)+DEPSZZ(I))*THIRD
+        !< Hydrostatic pressure increment        
+        DP(I)  = -K(I) * (DEPSXX(I)+DEPSYY(I)+DEPSZZ(I))
+        !< Deviatoric stress increments
+        DSXX(I) = G2(I) * (DEPSXX(I) - DAV(I))
+        DSYY(I) = G2(I) * (DEPSYY(I) - DAV(I))
+        DSZZ(I) = G2(I) * (DEPSZZ(I) - DAV(I))
+        DSXY(I) =  G(I) * DEPSXY(I)
+        DSYZ(I) =  G(I) * DEPSYZ(I)
+        DSZX(I) =  G(I) * DEPSZX(I)
+!
+        !< Previous timestep hydrostatic pressure
+        PO(I)  = -(SIGOXX(I) + SIGOYY(I) + SIGOZZ(I))*THIRD
+        !< Previous deviatoric stress tensor
+        SOXX(I) = SIGOXX(I) + PO(I)
+        SOYY(I) = SIGOYY(I) + PO(I)
+        SOZZ(I) = SIGOZZ(I) + PO(I)
+        SOXY(I) = SIGOXY(I)
+        SOYZ(I) = SIGOYZ(I)
+        SOZX(I) = SIGOZX(I)
+!
+        !< Trial devriatoric stress tensor
+        SXX(I) = SOXX(I) + DSXX(I)
+        SYY(I) = SOYY(I) + DSYY(I)
+        SZZ(I) = SOZZ(I) + DSZZ(I)
+        SXY(I) = SOXY(I) + DSXY(I)
+        SYZ(I) = SOYZ(I) + DSYZ(I)
+        SZX(I) = SOZX(I) + DSZX(I)
+        !< Trial pressure
+        P(I) = PO(I) + DP(I)   
+        !< Trial Cauchy stress tensor assembly
+        SIGNXX(I) = SXX(I) - P(I)
+        SIGNYY(I) = SYY(I) - P(I)
+        SIGNZZ(I) = SZZ(I) - P(I)
+        SIGNXY(I) = SXY(I)
+        SIGNYZ(I) = SYZ(I)
+        SIGNZX(I) = SZX(I)
+!
+        ! Trial Von Mises stress
+        Q2(I) = THREE_HALF*(SXX(I)**2 + SYY(I)**2 + SZZ(I)**2)
+     .        +      THREE*(SXY(I)**2 + SYZ(I)**2 + SZX(I)**2)
+        Q(I) = SQRT(Q2(I))
       ENDDO
-c------------------------------------------
-c     old criterion
-      DO I=1,NEL          
-        Q2(I) = THREE_HALF*(SO1(I)**2+SO2(I)**2+SO3(I)**2)
-     .        + THREE*(SO4(I)**2+SO5(I)**2+SO6(I)**2)
-        Q(I)  = SQRT(Q2(I))
-        UO(I) = UVAR(I,6)
-        FO(I) = FCRIT(PO(I),UO(I),TGB,C(I),PA(I),P0(I),PBMPA2(I),Q(I))
-      ENDDO
-c------------------------------------------
-cfp_poro +18 Pore pressure is calculated at the end
-cfp_poro in the first part U is the non linear cap shift
+!
+      !< Porosity computation
       IF (SAT0 > ZERO) THEN
         DO I=1,NEL
-          POR(I)=ONE-UNMSPOR0*EXP(EPSPV(I)-EPSPVOL0)
-          FAC=MAX(EM03,POR(I)/POR0)
-          MUW(I)=SAT0/FAC*AMU(I)
+          POR(I) = ONE - UNMSPOR0*EXP(EPSPV(I) - EPSPVOL0)
+          FAC = MAX(EM03,POR(I)/POR0)
+          MUW(I) = SAT0/FAC*AMU(I)
           IF (MUW(I) >= TOLMU) THEN
-            U(I)=KWATER*MUW(I)
+            U(I) = KWATER*MUW(I)
           ELSEIF (MUW(I) > -TOLMU) THEN
-            U(I)=KWATER/FOUR/TOLMU*(MUW(I)+TOLMU)**2
+            U(I) = KWATER/FOUR/TOLMU*(MUW(I)+TOLMU)**2
           ELSE
-            U(I)=ZERO
+            U(I) = ZERO
           ENDIF
           DU(I) = U(I) - UVAR(I,6)
           DUDMU(I)=ZERO
           IF (MUW(I) >= -TOLMU) DUDMU(I)=KWATER*SAT0/FAC
         ENDDO
       ELSE
-        DO I=1,NEL
-          MUW(I)=-ONE
-          U(I)  = ZERO
-          DU(I) = ZERO
-          DUDMU(I)=ZERO
-        ENDDO
+        MUW(1:NEL)   = -ONE
+        U(1:NEL)     = ZERO
+        DU(1:NEL)    = ZERO
+        DUDMU(1:NEL) = ZERO
       ENDIF  
-c------------------------------------------
-c     EVALUATION FONCTION CRITERE DE PLASTICITE
-c------------------------------------------
+!
+      !========================================================================
+      ! - COMPUTATION OF YIELD FUNCTION AND CHECK ELEMENT BEHAVIOR
+      !========================================================================
+      NINDX = 0
+      INDX(1:NEL) = 0
       DO I=1,NEL          
-        Q2(I) = THREE_HALF*(S1(I)**2+S2(I)**2+S3(I)**2)
-     .        + THREE*(S4(I)**2+S5(I)**2+S6(I)**2)
-        Q(I)= SQRT(Q2(I))
-        F(I)= FCRIT(P(I),U(I),TGB,C(I),PA(I),P0(I),PBMPA2(I),Q(I))
+        F(I) = FCRIT(P(I),U(I),TGB,C(I),PA(I),P0(I),PBMPA2(I),Q(I))
+        IF (F(I) > ZERO) THEN 
+          NINDX = NINDX + 1
+          INDX(NINDX) = I
+        ENDDO
       ENDDO
-c------------------------------------------
-c     ITERATION POUR TROUVER LE PT D'INTERSECTION AVEC LE CRITERE
-c------------------------------------------
-      DO I=1,NEL
-        IF (F(I) > TOL) THEN
-          IF (FO(I) < ZERO) THEN
-            X1 = ONE
-            X2 = ZERO
-            F1 = FO(I)
-            F2 = F(I)
-            DO NIT=1,NITMAX
-              X   = (X1*F2 - X2*F1) / (F2 - F1)  ! regula falsi
-              SY1 = S1(I) - X * DS1(I)
-              SY2 = S2(I) - X * DS2(I)    
-              SY3 = S3(I) - X * DS3(I)
-              SY4 = S4(I) - X * DS4(I)
-              SY5 = S5(I) - X * DS5(I)
-              SY6 = S6(I) - X * DS6(I)
-              PY  = P(I)  - X * DP(I) 
-              UY  = U(I)  - X * DU(I)
-              QY  = THREE_HALF*(SY1**2+SY2**2+SY3**2) + THREE*(SY4**2+SY5**2+SY6**2)
-              QY  = SQRT(QY)
-              FY  = FCRIT(PY,UY,TGB,C(I),PA(I),P0(I),PBMPA2(I),QY)
+!
+      !========================================================================
+      ! - PLASTIC CORRECTION WITH CUTTING PLANE (NEWTON-ITERATION) METHOD
+      !======================================================================== 
+      IF (NINDX > 0) THEN
+!
+        !< Loop over the iterations   
+        DO ITER = 1, NITER
+          !< Loop over yielding elements
+          DO II = 1, NINDX
+            I = INDX(II)
+c        
+            ! Note: in this part, the purpose is to compute for each iteration
+            ! a plastic multiplier allowing to update internal variables to satisfy
+            ! the consistency condition using the cutting plane method within an
+            ! iterative procedure.
+            ! Its expression at each iteration is : DLAMBDA = - F/DF_DLAMBDA
+            ! -> F          : current value of yield function (known)
+            ! -> DF_DLAMBDA : derivative of F with respect to DLAMBDA by taking
+            !                 into account of internal variables kinetic : 
+            !                 plasticity, damage ... (to compute)
 c
-              IF (FY*F1 > 0) THEN
-                X1 = X
-                F1 = FY
-              ELSEIF (FY*F2 > 0) THEN
-                X2 = X
-                F2 = FY
-              ELSE
-                EXIT
-              ENDIF
-c              IF (NIT == NITMAX) THEN
-c                print*, DX,FY,F(I)
-c              ENDIF
-            ENDDO
+            ! Derivative of yield criterion with respect to pressure and V.M stress
+            IF (P(I) <= PA(I)) THEN
+              DFDP  = -TGPHI
+            ELSE
+              RC    = (P(I) - PA(I))/(PB(I) - PA(I))
+              RC    = SQRT(ONE - MIN(ONE,RC**2))
+              DRCDP = (PA(I) - P(I))/(RC*(PB(I) - PA(I))**2)
+              DFDP  = - (DRCDP*(P(I)*TGPHI + C(I)) + RC*TGPHI)
+            ENDIF
+            DFDQ = ONE
 c
-c           constraints
-            DS1(I) = X*DS1(I)
-            DS2(I) = X*DS2(I)
-            DS3(I) = X*DS3(I)
-            DS4(I) = X*DS4(I)
-            DS5(I) = X*DS5(I)
-            DS6(I) = X*DS6(I)
-            DP(I)  = X*DP(I)
-            DU(I)  = X*DU(I)
+            ! Derivative of plastic potential with respect to pressure and V.M stress
+            IF (P(I) <= PA(I)) THEN
+              DGDP = -TGPSI
+            ELSEIF (P(I) <= P0(I)) THEN
+              DGDP = -TGPSI*(ONE - ((P(I) - PA(I))/(P0(I) - PA(I))))
+            ELSEIF (P(I) > PO(I)) THEN 
+              DGDP = DFDP
+            ENDIF  
+            DGDQ = ONE
+c        
+            ! 1 - Computation of Von Mises stress w.r.t stress tensor
+            !------------------------------------------------------------------
+            DQDSIGXX = THREE_HALF*S1(I)/MAX(Q(I),EM20)
+            DQDSIGYY = THREE_HALF*S2(I)/MAX(Q(I),EM20)
+            DQDSIGZZ = THREE_HALF*S3(I)/MAX(Q(I),EM20)
+            DQDSIGXY = THREE*S4(I)/MAX(Q(I),EM20)
+            DQDSIGYZ = THREE*S5(I)/MAX(Q(I),EM20)
+            DQDSIGZX = THREE*S6(I)/MAX(Q(I),EM20)
 c
-            S1(I) = SY1
-            S2(I) = SY2
-            S3(I) = SY3
-            S4(I) = SY4
-            S5(I) = SY5
-            S6(I) = SY6
-            P(I)  = PY
-            U(I)  = UY
-            Q(I)  = QY
-c           deformations
-            DE1(I) = X*D1(I)
-            DE2(I) = X*D2(I)
-            DE3(I) = X*D3(I)
-            DE4(I) = X*DEPSXY(I)
-            DE5(I) = X*DEPSYZ(I)
-            DE6(I) = X*DEPSZX(I)
-            DEPSVOL(I)=X*DEPSVOL(I)
-          ELSE
-            DE1(I) = D1(I)
-            DE2(I) = D2(I)
-            DE3(I) = D3(I)
-            DE4(I) = DEPSXY(I)
-            DE5(I) = DEPSYZ(I)
-            DE6(I) = DEPSZX(I)
-          ENDIF
-        ENDIF
-      ENDDO
-c---------------------------------
-c     CALCUL DE L'ECOULEMENT PLASTIQUE
-c---------------------------------
-      DO I=1,NEL
-        IF (F(I) > ZERO) THEN
-          IF (P(I) <= PA(I)) THEN
-            RC = ONE     
-            DFDP =-TGB  
-            DGDP =-TGP  
-            DFDPB= ZERO 
-          ELSE
-            IF (P(I) < P0(I)) THEN                                 
-              PU = P(I)                                           
-            ELSE IF (P(I) <= P0(I)+U(I)) THEN                      
-              PU = P0(I)                                          
-            ELSE                                                   
-              PU = P(I)-U(I)                                      
-            ENDIF                                                  
-            PMPA = PU - PA(I)                                      
-            RP = PMPA / PBMPA(I)                                   
-            RC = ONE - MIN(ONE, PMPA**2/PBMPA2(I))                   
-            RC = SQRT(RC)                                          
-            AA = TGB*PU + C(I)                                     
-            DRCDP = -PMPA/PBMPA2(I)/MAX(SMALL,RC)                  
-            DFDP  = -(TGB*RC + DRCDP*AA)                           
-            DRCDPB = PMPA**2/PBMPA2(I)/PBMPA(I)                    
-            DFDPB = -PU*PMPA*AA/PB(I)/PBMPA2(I)                     
-            DFDPB = DFDPB/MAX(SMALL,RC)                           
+            ! 2 - Computation of Hydrostatic ressure w.r.t stress tensor
+            !------------------------------------------------------------------
+            DPDSIGXX = -THIRD
+            DPDSIGYY = -THIRD
+            DPDSIGZZ = -THIRD
+            DPDSIGXY = ZERO
+            DPDSIGYZ = ZERO
+            DPDSIGZX = ZERO
 c
-            IF (P(I) > P0(I)) THEN                                 
-              DGDP = DFDP   ! associe sur le cap                   
-            ELSE                                                   
-              DGDP = -TGP*(P0(I)-P(I))/(P0(I)-PA(I))              
-              IF (SOFT_FLAG == 1) DFDPB = ZERO                     
-              DU(I) = ZERO                                         
-            ENDIF                                                  
-            IF (MUW(I) >= ZERO) DGDP = ZERO
-          ENDIF
+            ! 3 - Assembling derivatives of criterion w.r.t stress tensor
+            !------------------------------------------------------------------    
+            DFDSIGXX = DFDQ*DQDSIGXX + DFDP*DPDSIGXX
+            DFDSIGYY = DFDQ*DQDSIGYY + DFDP*DPDSIGYY
+            DFDSIGZZ = DFDQ*DQDSIGZZ + DFDP*DPDSIGZZ
+            DFDSIGXY = DFDQ*DQDSIGXY + DFDP*DPDSIGXY
+            DFDSIGYZ = DFDQ*DQDSIGYZ + DFDP*DPDSIGYZ
+            DFDSIGZX = DFDQ*DQDSIGZX + DFDP*DPDSIGZX
 c
-          DFDC = -RC
-c         MAX_DILAT est toujours negatif.
-          IF (RHO(I) <= (ONE+MAX_DILAT)*RHO0(I)) THEN
-            DGDP=MAX(ZERO,DGDP)
-            DFDP=MAX(ZERO,DFDP)
-          ENDIF
+            ! 3 - Assembling derivatives of criterion w.r.t plastic potential
+            !------------------------------------------------------------------  
+            DGDSIGXX = DGDQ*DQDSIGXX + DGDP*DPDSIGXX
+            DGDSIGYY = DGDQ*DQDSIGYY + DGDP*DPDSIGYY
+            DGDSIGZZ = DGDQ*DQDSIGZZ + DGDP*DPDSIGZZ
+            DGDSIGXY = DGDQ*DQDSIGXY + DGDP*DPDSIGXY
+            DGDSIGYZ = DGDQ*DQDSIGYZ + DGDP*DPDSIGYZ
+            DGDSIGZX = DGDQ*DQDSIGZX + DGDP*DPDSIGZX
+c
+            ! Derivative of yield criterion with respect to PB
+            IF (P(I) <= PA(I)) THEN
+              DFDPB = ZERO
+              DFDPA = ZERO
+            ELSE
+              DFDPB = -((P(I) - PA(I))**2)/(RC*(PB(I) - PA(I))**3)
+              DFDPA = (P(I)-PA(I))*(P(I)-PB(I))/(RC*(PB(I)-PA(I))**3)
+            ENDIF
+c
+            ! Derivative of PB w.r.t plastic multiplier
+            DPDLAM = 
+c
+            ! Derivative ot criterion w.r.t material cohesion
+            DFDC = 
+c
+            ! Derivative of material cohesion w.r.t plastic multiplier
+            DCDLAM =
+c
+            ! 4 - Derivative of yield criterion w.r.t plastic multiplier
+            !------------------------------------------------------------------ 
+            TRDGPDS   = DGDSIGXX + DGDSIGYY + DGDSIGZZ  
+            DFDSIG2   = DFDSIGXX * (DGDSIGXX*G2 + LAM*TRDGPDS)
+     .                + DFDSIGYY * (DGDSIGYY*G2 + LAM*TRDGPDS)
+     .                + DFDSIGZZ * (DGDSIGZZ*G2 + LAM*TRDGPDS) 
+     .                + DFDSIGXY *  DGDSIGXY*G
+     .                + DFDSIGYZ *  DGDSIGYZ*G
+     .                + DFDSIGZX *  DGDSIGZX*G  
+     
+     
+            DFDPB = 
+            DFDC  = 
+ 
 
-          IF (Q(I) > EM20) THEN
-            FAC   = THREE_HALF/Q(I)
-            DFDS1 = S1(I)*FAC
-            DFDS2 = S2(I)*FAC
-            DFDS3 = S3(I)*FAC
-            DFDS4 = S4(I)*FAC
-            DFDS5 = S5(I)*FAC
-            DFDS6 = S6(I)*FAC
-          ELSE
-            DFDS1 =ZERO
-            DFDS2 =ZERO
-            DFDS3 =ZERO
-            DFDS4 =ZERO
-            DFDS5 =ZERO
-            DFDS6 =ZERO        
-          ENDIF
+
+
+            DF_DLAM = - DFDSIG2 + DFDPB*DPBDLAM + DFDC*DCDLAM
+
+c            
+            !< Derivarive of yield criterion and plastic potential w.r.t pressure
+            !<  Tensile zone, not on the cap
+            IF (P(I) <= PA(I)) THEN
+              RC    =  ONE     
+              DFDP  = -TGB  
+              DGDP  = -TGP  
+              DFDPB =  ZERO 
+            !<  Transition and cap for compression
+            ELSE
+              IF (P(I) < P0(I)) THEN                                 
+                PU = P(I)                                           
+              ELSE IF (P(I) <= P0(I)+U(I)) THEN                      
+                PU = P0(I)          
+              !< Shift to consider pore pressure                                
+              ELSE                                                   
+                PU = P(I) - U(I)                                      
+              ENDIF                                                  
+              PMPA   = PU - PA(I)                                      
+              RP     = PMPA / PBMPA(I)                                   
+              RC     = ONE - MIN(ONE, PMPA**2/PBMPA2(I))                   
+              RC     = SQRT(RC)                                          
+              AA     = TGB*PU + C(I)                                     
+              DRCDP  = -PMPA/PBMPA2(I)/MAX(SMALL,RC)                  
+              DFDP   = -(TGB*RC + DRCDP*AA)                           
+              DRCDPB = PMPA**2/PBMPA2(I)/PBMPA(I)                    
+              DFDPB  = -PU*PMPA*AA/PB(I)/PBMPA2(I)                     
+              DFDPB  = DFDPB/MAX(SMALL,RC)   
+              !< Associated flow rule on the cap                        
+              IF (P(I) > P0(I)) THEN                                 
+                DGDP = DFDP
+              !< Non-associated flow rule otherwise              
+              ELSE                                                   
+                DGDP = -TGP*(P0(I)-P(I))/(P0(I)-PA(I))              
+                IF (SOFT_FLAG == 1) DFDPB = ZERO                     
+                DU(I) = ZERO                                         
+              ENDIF                                                  
+              IF (MUW(I) >= ZERO) DGDP = ZERO
+            ENDIF
+            DFDC = -RC
+            !< MAX_DILAT always negative
+            IF (RHO(I) <= (ONE+MAX_DILAT)*RHO0(I)) THEN
+              DGDP=MAX(ZERO,DGDP)
+              DFDP=MAX(ZERO,DFDP)
+            ENDIF
 c
-          IF (RC > EM05) THEN
-c           DENOMINATEUR         
-            HH = THREE*G(I) - DFDC*DCDEPSP(I) + K(I)*DFDP*DGDP 
-     .         - DGDP*DFDPB*DPBDEPSP(I)
-c
-c           INCREMENT DEFORMATIONS PASTIQUES
-c           il y a deux fois dfds4 c'est df/ds12 et non (df/ds12 + df/ds21)
-c
-            DLAMBDA = DFDS1*DS1(I) + DFDS2*DS2(I) + DFDS3*DS3(I)
-     .              +(DFDS4*DS4(I)+ DFDS5*DS5(I)+ DFDS6*DS6(I))*TWO
-     .              + DFDP*(DP(I)-DU(I))
-C
-            DLAMBDA = DLAMBDA/MAX(HH,EM20)
-C
-            DEPSP1 =   DLAMBDA*DFDS1 
-            DEPSP2 =   DLAMBDA*DFDS2 
-            DEPSP3 =   DLAMBDA*DFDS3 
-c           le facteur 2 est du au fait que c'est des gamma
-            DEPSP4 = TWO*DLAMBDA*DFDS4 
-            DEPSP5 = TWO*DLAMBDA*DFDS5 
-            DEPSP6 = TWO*DLAMBDA*DFDS6
-            DEPSPV = DLAMBDA*DGDP
-          ELSE
-            DEPSP1 = DE1(I)
-            DEPSP2 = DE2(I)
-            DEPSP3 = DE3(I)
-            DEPSP4 = DE4(I)
-            DEPSP5 = DE5(I)
-            DEPSP6 = DE6(I)
-            DEPSPV = (DP(I)-DU(I))/(K(I)+DPBDEPSP(I))
-            IF (MUW(I) >= ZERO) DEPSPV=ZERO
-          ENDIF
+            DQDS1_DSDLAM = -DQDSIG1*DQDSIG1*G2(I) -                             &
+                            DQDSIG2*DQDSIG2*G2(I) -
+                            DQDSIG3*DQDSIG3*G2(I) - 
+                            DQDSIG4*DQDSIG4*G(I)  - 
+                            DQDSIG5*DQDSIG5*G(I)  - 
+                            DQDSIG6*DQDSIG6*G(I) 
+            
+            DPDSIG_DSIGDLAM = K(I)*DGDP
+            
+            DF_DLAM = DQDSIG_DSIGDLAM + DFDP*DPDSIG_DSIGDLAM
+
+            
+            
+            
+
+
+DFDQ*(-THREE*G(I)*DGDQ) + 
+            DFDSIG2 = NORMFXX * NORMGXX * G2(I)
+     .              + NORMYY * NORMYY * G2(I)
+     .              + NORMZZ * NORMZZ * G2(I)
+     .              + NORMXY * NORMXY * G(I)
+     .              + NORMYZ * NORMYZ * G(I)
+     .              + NORMZX * NORMZX * G(I)
+
+
+
+c             DENOMINATEUR         
+              HH = THREE*G(I) + K(I)*DFDP*DGDP - DFDC*DCDEPSP(I) 
+     .             - DGDP*DFDPB*DPBDEPSP(I)
+c  
+c             INCREMENT DEFORMATIONS PASTIQUES
+c             il y a deux fois dfds4 c'est df/ds12 et non (df/ds12 + df/ds21)
+C  
+              DLAMBDA = -F(I)/MAX(HH,EM20)
+C  
+              DEPSP1 =   DLAMBDA*DFDS1 
+              DEPSP2 =   DLAMBDA*DFDS2 
+              DEPSP3 =   DLAMBDA*DFDS3 
+c             le facteur 2 est du au fait que c'est des gamma
+              DEPSP4 = TWO*DLAMBDA*DFDS4 
+              DEPSP5 = TWO*DLAMBDA*DFDS5 
+              DEPSP6 = TWO*DLAMBDA*DFDS6
+              DEPSPV = DLAMBDA*DGDP
 C
 c         INCREMENT DEFORMATIONS ELASTIQUES DEVIATORIQUE
 C
@@ -572,30 +632,24 @@ C
 C
           IF (QX2 > SMALL) EPSPD(I) = EPSPD(I) + DWPX2/QX2
 C          
-          ! -------------------------------------------------------------------------
-          ! Modification (26/05/2020) - V.DAVAZE - for missing scale factors in manual
           IF (IFUNC(3) > 0) THEN 
             C(I) = YLDINI*FINTER(IFUNC(3),EPSPD(I),NPF,TF,DCDEPSP(I))
           ELSE
             C(I) = YLDINI
           ENDIF
           C(I) = MAX(C(I), ZERO)
-          ! -------------------------------------------------------------------------          
 C
           IF (SOFT_FLAG == 1) THEN
-             EPSPV(I) = EPSPV(I) + MAX(DEPSPV,ZERO)
+            EPSPV(I) = EPSPV(I) + MAX(DEPSPV,ZERO)
           ELSE
-             EPSPV(I) = EPSPV(I) + DEPSPV
+            EPSPV(I) = EPSPV(I) + DEPSPV
           ENDIF
 C     
-          ! -------------------------------------------------------------------------
-          ! Modification (26/05/2020) - V.DAVAZE - for missing scale factors in manual
           IF (IFUNC(4) > 0) THEN
             PB(I) = CAPINI*FINTER(IFUNC(4),EPSPV(I),NPF,TF,DPBDEPSP(I))
           ELSE
             PB(I) = CAPINI
           ENDIF
-          ! -------------------------------------------------------------------------
           IF (IFUNC(1) > 0) K(I) = KINI*FINTER(IFUNC(1),EPSPV(I),NPF,TF,DERI)
           IF (IFUNC(2) > 0) G(I) = GINI*FINTER(IFUNC(2),EPSPV(I),NPF,TF,DERI)
 C
@@ -645,15 +699,15 @@ C             WRITE(6,*)'TRI-TRACTION FAILURE'
 c******
 c               fp_poro This section has been simplified w.r.t. DPCAP
 c******
-                IF (PN(I) < P0(I)) THEN
-                   PU = PN(I)
-                ELSE IF (PN(I) <= P0(I)+U(I)) THEN
-                   PU = P0(I)
-                ELSE
-                   PU = PN(I) - U(I)
-                ENDIF
-                IF (PN(I) > PA(I)) THEN
-                  RC = SQRT(MAX(ZERO,ONE - ((PU-PA(I))**2/PBMPA2(I))))
+              IF (PN(I) < P0(I)) THEN
+                PU = PN(I)
+              ELSE IF (PN(I) <= P0(I)+U(I)) THEN
+                PU = P0(I)
+              ELSE
+                PU = PN(I) - U(I)
+              ENDIF
+              IF (PN(I) > PA(I)) THEN
+                RC = SQRT(MAX(ZERO,ONE - ((PU-PA(I))**2/PBMPA2(I))))
                 ELSE
                   RC = ONE
                 ENDIF
@@ -679,17 +733,18 @@ C                   ENDIF
                   S5N(I) = ZERO 
                   S6N(I) = ZERO
                   PN(I)  = PB(I)+U(I)                    
-               ENDIF               
+                ENDIF               
+              ENDIF
             ENDIF
-          ENDIF
-          SIGNXX(I) = S1N(I)-PN(I)
-          SIGNYY(I) = S2N(I)-PN(I)
-          SIGNZZ(I) = S3N(I)-PN(I)
-          SIGNXY(I) = S4N(I)
-          SIGNYZ(I) = S5N(I)
-          SIGNZX(I) = S6N(I)
+            SIGNXX(I) = S1N(I)-PN(I)
+            SIGNYY(I) = S2N(I)-PN(I)
+            SIGNZZ(I) = S3N(I)-PN(I)
+            SIGNXY(I) = S4N(I)
+            SIGNYZ(I) = S5N(I)
+            SIGNZX(I) = S6N(I)
 C         
-        ENDIF   ! F > 0       
+            F(I)= FCRIT(P(I),U(I),TGB,C(I),PA(I),P0(I),PBMPA2(I),Q(I))
+        ENDDO      
       ENDDO     ! I=1,NEL
 c----------------------------------------------
 c     END OF PLASTICITY PROJECTION LOOP

@@ -167,6 +167,21 @@ C--------------------------------------------------
           ISOLNOD(I)=6
         ELSE
           ISOLNOD(I)=8
+          ! Check degenerated bricks
+          IF (IXS(3,I) == IXS(4,I)) THEN 
+            write(*,*) "Test avant = ", IXS(2:9,I)
+            IXS(3,I) = IXS(2,I)
+            IXS(2,I) = IXS(5,I)
+            IXS(5,I) = IXS(4,I)
+            write(*,*) "Test apres = ", IXS(2:9,I)
+          ENDIF
+          IF (IXS(7,I) == IXS(8,I)) THEN
+            write(*,*) "Test2 avant = ", IXS(2:9,I) 
+            IXS(7,I) = IXS(6,I)
+            IXS(6,I) = IXS(9,I)
+            IXS(9,I) = IXS(8,I)
+            write(*,*) "Test2 apres = ", IXS(2:9,I)
+          ENDIF  
         ENDIF
 C--------------------------------------------------
 C      INTERNAL PART ID
