@@ -44,6 +44,7 @@ subroutine hm_read_mat(                                                   &
       use matparam_def_mod
       use hm_option_read_mod
       use table_mod
+      use hm_read_mat81_mod
       use hm_read_mat169_arup_mod
       use hm_read_mat125_mod
       use hm_read_mat126_mod
@@ -739,9 +740,9 @@ subroutine hm_read_mat(                                                   &
           case ('LAW81')
             ilaw = 81
             call hm_read_mat81(&
-            &uparam   ,maxuparam,nuparam  ,nuvar    ,ifunc    ,&
-            &maxfunc  ,nfunc    ,parmat   ,mat_id   ,pm(1,i)  ,&
-            &titr     ,unitab   ,lsubmodel,mtag     ,matparam )
+            &matparam ,nuvar    ,ifunc    ,maxfunc  ,nfunc    ,&
+            &parmat   ,mat_id   ,titr     ,unitab   ,lsubmodel,&
+            &mtag     ,iout     )
 !-------
           case ('LAW82')
             ilaw = 82
