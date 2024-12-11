@@ -28,7 +28,8 @@
 ! ======================================================================================================================
       subroutine hm_read_mat81(matparam ,nuvar    ,ifunc    ,maxfunc  ,        &
                                nfunc    ,parmat   ,mat_id   ,titr     ,        &
-                               unitab   ,lsubmodel,mtag     ,iout     )
+                               unitab   ,lsubmodel,mtag     ,iout     ,        &
+                               nvartmp  )
 !-------------------------------------------------------------------------------
 !   M o d u l e s
 !-------------------------------------------------------------------------------
@@ -58,10 +59,11 @@
       type(submodel_data),dimension(nsubmod),intent(in) :: lsubmodel !< submodel data structure
       type(mlaw_tag_), intent(inout)             :: mtag      !< material tag for internal variables in element buffer
       integer, intent(in)                        :: iout      !< output file number
+      integer, intent(inout)                     :: nvartmp   !< number of temporary variables
 !------------------------------------------------------------------------------
 !   L o c a l   V a r i a b l e s
 !------------------------------------------------------------------------------
-      my_real :: kini,gini,yldini,capini,beta,psi,alpha,max_dilat,epsvini,     &
+      my_real :: kini,gini,cini,capini,phi,psi,alpha,max_dilat,epsvini,     &
         kwater,por0,sat0,u0,muw0,viscfac,tol,rho0,rhor,fac_unit
       integer :: soft_flag,ilaw
       logical :: is_available,is_encrypted
@@ -81,10 +83,10 @@
 !Card2
       call hm_get_floatv('K0'       ,kini     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_G0'   ,gini     ,is_available, lsubmodel, unitab)
-      call hm_get_floatv('MAT_COH0' ,yldini   ,is_available, lsubmodel, unitab)
+      call hm_get_floatv('MAT_COH0' ,cini     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_PB0'  ,capini   ,is_available, lsubmodel, unitab)
 !Card3
-      call hm_get_floatv('MAT_BETA' ,beta     ,is_available, lsubmodel, unitab)
+      call hm_get_floatv('MAT_Beta' ,phi      ,is_available, lsubmodel, unitab)
       call hm_get_floatv('PSI'      ,psi      ,is_available, lsubmodel, unitab)
 !Card4
       call hm_get_floatv('MAT_ALPHA',alpha    ,is_available, lsubmodel, unitab)
@@ -149,7 +151,7 @@
                     c1=titr)
       endif
       if (ifunc(3) == 0) then
-        if (yldini == zero) then 
+        if (cini == zero) then 
           call ancmsg(msgid=1713,                                              &
                       msgtype=msgerror,                                        &
                       anmode=aninfo_blind_1,                                   &
@@ -165,44 +167,44 @@
       endif
       if (ifunc(4) == 0) then
         if (capini == zero) then 
-          call ancmsg(msgid=1714,                                             &
-                      msgtype=msgerror,                                       &
-                      anmode=aninfo_blind_1,                                  &
-                      i1=mat_id,                                              &
+          call ancmsg(msgid=1714,                                              &
+                      msgtype=msgerror,                                        &
+                      anmode=aninfo_blind_1,                                   &
+                      i1=mat_id,                                               &
                       c1=titr)         
         else
-          call ancmsg(msgid=1017,                                             &
-                      msgtype=msgwarning,                                     &
-                      anmode=aninfo,                                          &
-                      i1=mat_id,                                              &
+          call ancmsg(msgid=1017,                                              &
+                      msgtype=msgwarning,                                      &
+                      anmode=aninfo,                                           &
+                      i1=mat_id,                                               &
                       c1=titr)        
         endif
       endif
       ! Default value for scale factors of c and Pb
-      if (yldini == zero) then 
-        call hm_get_floatv_dim('mat_coh0',fac_unit,is_available,lsubmodel,    &
+      if (cini == zero) then 
+        call hm_get_floatv_dim('mat_coh0',fac_unit,is_available,lsubmodel,     &
                                unitab    )
-        yldini = one*fac_unit
+        cini = one*fac_unit
       endif
       if (capini == zero) then 
-        call hm_get_floatv_dim('mat_pb0',fac_unit,is_available,lsubmodel,     &
+        call hm_get_floatv_dim('mat_pb0',fac_unit,is_available,lsubmodel,      &
                               unitab    )
         capini = one*fac_unit
       endif
       if (sat0 /= zero) then
         if (kwater <= zero) then
-          call ancmsg(msgid=1085,                                             &
-                      msgtype=msgerror,                                       &
-                      anmode=aninfo_blind_1,                                  &
-                      i1=mat_id,                                              &
+          call ancmsg(msgid=1085,                                              &
+                      msgtype=msgerror,                                        &
+                      anmode=aninfo_blind_1,                                   &
+                      i1=mat_id,                                               &
                       c1=titr)
         endif
         muw0 = 0
         if (por0 == zero) then
-          call ancmsg(msgid=1086,                                             &
-                      msgtype=msgerror,                                       &
-                      anmode=aninfo_blind_1,                                  &
-                      i1=mat_id,                                              &
+          call ancmsg(msgid=1086,                                              &
+                      msgtype=msgerror,                                        &
+                      anmode=aninfo_blind_1,                                   &
+                      i1=mat_id,                                               &
                       c1=titr)
         elseif (u0 > zero) then
           muw0 = u0/kwater
@@ -225,11 +227,13 @@
       !< Number of integer material parameters
       matparam%niparam = 1
       !< Number of real material parameters
-      matparam%nuparam = 15
+      matparam%nuparam = 13
       !< Number of user variables 
-      nuvar = 6
+      nuvar = 10
       !< Number of functions
       nfunc = 4
+      !< Number of temporary variables
+      nvartmp = 4
 !          
       !< Allocation of material parameters tables
       allocate (matparam%iparam(matparam%niparam))
@@ -239,19 +243,19 @@
       matparam%iparam(1)  = soft_flag
 !
       !< Real material parameters
-      matparam%uparam(1)  = tand(beta)
+      matparam%uparam(1)  = tand(phi)
       matparam%uparam(2)  = tand(psi)
-      matparam%uparam(3)  = alpha
-      matparam%uparam(4)  = max_dilat
-      matparam%uparam(5)  = epsvini
-      matparam%uparam(6)  = kwater
-      matparam%uparam(7)  = por0
-      matparam%uparam(8)  = muw0 + one
-      matparam%uparam(9)  = u0
-      matparam%uparam(10) = tol
-      matparam%uparam(11) = viscfac
-      matparam%uparam(12) = yldini
-      matparam%uparam(13) = capini
+      matparam%uparam(3)  = cini
+      matparam%uparam(4)  = capini
+      matparam%uparam(5)  = alpha
+      matparam%uparam(6)  = max_dilat
+      matparam%uparam(7)  = epsvini
+      matparam%uparam(8)  = kwater
+      matparam%uparam(9)  = por0
+      matparam%uparam(10) = muw0 + one
+      matparam%uparam(11) = u0
+      matparam%uparam(12) = tol
+      matparam%uparam(13) = viscfac
 !
       !< Elastic parameters
       matparam%bulk  = kini
@@ -296,50 +300,58 @@
         write(iout,'(5x,a,//)')'CONFIDENTIAL DATA'
       else
         write(iout,1200) rho0
-        write(iout,1300) kini,gini,yldini,capini
-        write(iout,1400) beta,psi
-        write(iout,1500) alpha,max_dilat,epsvini
-        write(iout,1600) ifunc(1),ifunc(2),ifunc(3),ifunc(4),soft_flag
-        write(iout,1700) kwater,por0,sat0,u0
-        write(iout,1800) tol,viscfac
+        write(iout,1300) kini,gini,ifunc(1),ifunc(2)  
+        write(iout,1400) cini,capini,ifunc(3),ifunc(4),phi,psi
+        write(iout,1500) alpha,max_dilat,epsvini,soft_flag
+        write(iout,1600) kwater,por0,sat0,u0
+        write(iout,1700) tol,viscfac
       endif     
 !-------------------------------------------------------------------------------
  1000 format(/                                                                 &
-       5x,a,/,                                                                 &
-       5x,'MATERIAL NUMBER. . . . . . . . . . . . . . .=',i10/,                &
-       5x,'MATERIAL LAW . . . . . . . . . . . . . . . .=',i10/)
- 1100 format(                                                                  &
-       5x,'---------------------------------------------',/,                   &
-       5x,'  MATERIAL MODEL: DRUCKER PRAGER WITH CAP    ',/,                   &
-       5x,'---------------------------------------------',/)
- 1200 FORMAT(                                                                  &
-       5x,'INITIAL DENSITY  . . . . . . . . . . . . . .=',1pg20.13/)  
- 1300 FORMAT(                                                                  &
-       5x,'INITIAL BULK MODULUS (K0) . . . . . . . . . =',1pg20.13/,           &
-       5x,'INITIAL SHEAR MODULUS (G0). . . . . . . . . =',1pg20.13/,           &
-       5x,'INITIAL MATERIAL COHESION (C0). . . . . . . =',1pg20.13/,           &
-       5x,'INITIAL CAP LIMIT PRESSURE (PB0). . . . . . =',1pg20.13/)
- 1400 FORMAT(                                                                  &
-       5x,'FRICTION ANGLE (PHI). . . . . . . . . . . . =',1pg20.13/,           &
-       5x,'PLASTIC FLOW ANGLE (PSI). . . . . . . . . . =',1pg20.13/)           
- 1500 FORMAT(                                                                  &
-       5x,'ALPHA: RATIO PA/PB. . . . . . . . . . . . . =',1pg20.13/,           &
-       5x,'MAXIMUM DILATANCY (EPS_MAX) . . . . . . . . =',1pg20.13/,           &
-       5x,'INITIAL PLASTIC VOLUMETRIC STRAIN (EPSPV0). =',1pg20.13/)
- 1600 FORMAT(                                                                  &
-       5x,'BULK MODULUS K SCALE FUNCTION . . . . . . . =',i10/,                &
-       5x,'SHEAR MODULUS G SCALE FUNCTION  . . . . . . =',i10/,                &
-       5x,'MATERIAL COHESION C SCALE FUNCTION  . . . . =',i10/,                &
-       5x,'CAP LIMIT PRESSURE PB SCALE FUNCTION  . . . =',i10/,                &
-       5x,'FLAG: =0 SOFTENING ALLOWED, =1 NO SOFTENING =',i10/)
- 1700 FORMAT(                                                                  &
-       5x,'BULK MODULUS OF WATER . . . . . . . . . . . =',1pg20.13/            &
-       5x,'INITIAL POROSITY POR0 . . . . . . . . . . . =',1pg20.13/            &
-       5x,'INITIAL WATER SATURATION SAT0 . . . . . . . =',1pg20.13/            &
-       5x,'INITIAL PORE PRESSURE U0  . . . . . . . . . =',1pg20.13/)
- 1800 FORMAT(                                                                  &
-     & 5x,'TOLERANCE FOR THE CRITERION SHIFT . . . . . =',1pg20.13/            &
-     & 5x,'VISCOSITY FACTOR  . . . . . . . . . . . . . =',1pg20.13/)
+       5X,A,/,                                                                 &
+       5X,'MATERIAL NUMBER. . . . . . . . . . . . . . .=',I10/,                &
+       5X,'MATERIAL LAW . . . . . . . . . . . . . . . .=',I10/)
+ 1100 format(/                                                                 &
+       5X,'-----------------------------------------------------',/,           &
+       5X,'  MATERIAL MODEL: DRUCKER-PRAGER WITH CAP HARDENING  ',/,           &
+       5X,'-----------------------------------------------------',/)
+ 1200 FORMAT(/                                                                 &
+       5X,'INITIAL DENSITY  . . . . . . . . . . . . . .=',1PG20.13/)  
+ 1300 FORMAT(/                                                                 &
+       5X,'ELASTIC PARAMETERS:                          ',/,                   &
+       5X,'---------------------------------------------',/,                   &
+       5X,'INITIAL BULK MODULUS (K0) . . . . . . . . . =',1PG20.13/,           &
+       5X,'INITIAL SHEAR MODULUS (G0). . . . . . . . . =',1PG20.13/,           &
+       5X,'BULK  MODULUS K SCALE FUNCTION ID . . . . . =',I10/,                &
+       5X,'SHEAR MODULUS G SCALE FUNCTION ID . . . . . =',I10/)
+ 1400 FORMAT(/                                                                 &
+       5X,'YIELD CRITERION & PLAST.POTENTIAL PARAMETERS:',/,                   &
+       5X,'---------------------------------------------',/,                   &
+       5X,'INITIAL MATERIAL COHESION (C0). . . . . . . =',1PG20.13/,           &
+       5X,'INITIAL CAP LIMIT PRESSURE (PB0). . . . . . =',1PG20.13/            &
+       5X,'MATERIAL COHESION C SCALE FUNCTION ID . . . =',I10/,                &
+       5X,'CAP LIMIT PRESSURE PB SCALE FUNCTION ID . . =',I10/,                &
+       5X,'YIELD CRITERION FRICTION ANGLE (PHI). . . . =',1PG20.13/,           &
+       5X,'PLASTIC POTENTIAL FLOW ANGLE (PSI). . . . . =',1PG20.13/)  
+ 1500 FORMAT(/                                                                 &
+       5X,'OTHER PARAMETERS:                            ',/,                   &
+       5X,'---------------------------------------------',/,                   &
+       5X,'ALPHA RATIO (PA/PB) . . . . . . . . . . . . =',1PG20.13/,           &
+       5X,'MAXIMUM DILATANCY (EPS_MAX) . . . . . . . . =',1PG20.13/,           &
+       5X,'INITIAL PLASTIC VOLUMETRIC STRAIN (EPSPV0). =',1PG20.13/,           &
+       5X,'CAP SOFTENING FLAG (ISOFT). . . . . . . . . =',I10/                 &
+       5X,'  ISOFT = 0: CAP HARDENING SOFTENING ALLOWED ',/,                   &
+       5X,'  ISOFT = 1: NO CAP HARDENING SOFTENING      ',/)
+ 1600 FORMAT(/                                                                 &
+       5X,'POROSITY PARAMETERS:                         ',/,                   &
+       5X,'---------------------------------------------',/,                   &
+       5X,'BULK MODULUS OF WATER . . . . . . . . . . . =',1PG20.13/            &
+       5X,'INITIAL POROSITY POR0 . . . . . . . . . . . =',1PG20.13/            &
+       5X,'INITIAL WATER SATURATION SAT0 . . . . . . . =',1PG20.13/            &
+       5X,'INITIAL PORE PRESSURE U0  . . . . . . . . . =',1PG20.13/)
+ 1700 FORMAT(/                                                                 &
+     & 5X,'TOLERANCE FOR THE CRITERION SHIFT . . . . . =',1PG20.13/            &
+     & 5X,'VISCOSITY FACTOR  . . . . . . . . . . . . . =',1PG20.13/)
 !-------------------------------------------------------------------------------
       end subroutine hm_read_mat81
       end module hm_read_mat81_mod

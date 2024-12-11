@@ -876,12 +876,12 @@ contains
             &itable   ,maxtabl  ,numtabl  ,nvartmp  ,table    ,&
             &matparam )
 !-------
-          case ('LAW81')
+          case ('LAW81','DPRAG_CAP')
             ilaw = 81
             call hm_read_mat81(&
             &matparam ,nuvar    ,ifunc    ,maxfunc  ,nfunc    ,&
             &parmat   ,mat_id   ,titr     ,unitab   ,lsubmodel,&
-            &mtag     ,iout     )
+            &mtag     ,iout     ,nvartmp  )
 !-------
           case ('LAW82')
             ilaw = 82
