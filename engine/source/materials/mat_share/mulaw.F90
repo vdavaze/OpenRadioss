@@ -1526,14 +1526,12 @@
           elseif (mtn == 81) then
             call sigeps81(&
             &nel     ,nuvar   ,uvar    ,matparam,nfunc   ,ifunc   ,&
-            &ngl     ,npf     ,tf      ,tt      ,rho0    ,rho     ,&
-            &voln    ,amu     ,defp    ,ssp     ,vis     ,         &
-            &ep1     ,ep2     ,ep3     ,ep4     ,ep5     ,ep6     ,&
+            &npf     ,tf      ,snpc    ,stf     ,rho0    ,rho     ,&
+            &voln    ,amu     ,defp    ,ssp     ,vis     ,dt1     ,&
             &de1     ,de2     ,de3     ,de4     ,de5     ,de6     ,&
             &so1     ,so2     ,so3     ,so4     ,so5     ,so6     ,&
             &s1      ,s2      ,s3      ,s4      ,s5      ,s6      ,&
-            &sv1     ,sv2     ,sv3     ,nvartmp ,vartmp  ,lbuf%seq,&
-            &snpc    ,stf     )
+            &sv1     ,sv2     ,sv3     ,nvartmp ,vartmp  ,lbuf%seq)
 !
           elseif (mtn == 82) then
             call sigeps82(nel ,npar,nuvar,nfunc,ifunc,&
