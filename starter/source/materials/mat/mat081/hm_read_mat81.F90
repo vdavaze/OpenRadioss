@@ -77,51 +77,57 @@
 !-------------------------------------------------------------------------------
       call hm_option_is_encrypted(is_encrypted)
 !-------------------------------------------------------------------------------
-!Card1
+!< Card1
       call hm_get_floatv('MAT_RHO'  ,rho0     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('REFER_RHO',rhor     ,is_available, lsubmodel, unitab)
-!Card2
+!< Card2
       call hm_get_floatv('K0'       ,kini     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_G0'   ,gini     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_COH0' ,cini     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_PB0'  ,capini   ,is_available, lsubmodel, unitab)
-!Card3
+!< Card3
       call hm_get_floatv('MAT_Beta' ,phi      ,is_available, lsubmodel, unitab)
       call hm_get_floatv('PSI'      ,psi      ,is_available, lsubmodel, unitab)
-!Card4
+!< Card4
       call hm_get_floatv('MAT_ALPHA',alpha    ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_EPS'  ,max_dilat,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_SRP'  ,epsvini  ,is_available, lsubmodel, unitab)
-!Card5
+!< Card5
       call hm_get_intv  ('FUN_A1'   ,ifunc(1) ,is_available, lsubmodel)
       call hm_get_intv  ('FUN_A2'   ,ifunc(2) ,is_available, lsubmodel)
       call hm_get_intv  ('FUN_A3'   ,ifunc(3) ,is_available, lsubmodel)
       call hm_get_intv  ('FUN_A4'   ,ifunc(4) ,is_available, lsubmodel)
       call hm_get_intv  ('IFLAG'    ,soft_flag,is_available, lsubmodel)
-!Card6
+!< Card6
       call hm_get_floatv('MAT_KW'   ,kwater   ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_POR0' ,por0     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_SAT0' ,sat0     ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_MUE0' ,u0       ,is_available, lsubmodel, unitab)
-!Card7
+!< Card7
       call hm_get_floatv('MAT_TOL'  ,tol      ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_VIS'  ,viscfac  ,is_available, lsubmodel, unitab)
 !      
-!-------------------------------------------------------------------------------
-!     Default values
-!-------------------------------------------------------------------------------
-      if (kwater == zero) kwater = one
-      if (por0 == zero) por0 = zero
-      if (sat0 == zero) sat0 = zero
-      if (u0 == zero) u0 = zero
-      if (tol == zero) tol = em04
-      if (viscfac == zero) viscfac = half
+      !-------------------------------------------------------------------------
+      !< Default values
+      !-------------------------------------------------------------------------
+      !< Alpha ratio Pa/Pb
+      if (alpha == zero) alpha = half
+      alpha = min(alpha,one)
+      alpha = max(alpha,zero)
+      !< Maximum dilatancy
       if (max_dilat == zero) max_dilat = -infinity
       max_dilat = -abs(max_dilat)
-      if (alpha == zero) alpha = half
-!-------------------------------------------------------------------------------
-!     Data checking
-!-------------------------------------------------------------------------------
+      !< Porosity related parameters
+      if (kwater == zero)  kwater  = one
+      if (por0 == zero)    por0    = zero
+      if (sat0 == zero)    sat0    = zero
+      if (u0 == zero)      u0      = zero
+      if (tol == zero)     tol     = em04
+      if (viscfac == zero) viscfac = half
+!
+      !-------------------------------------------------------------------------
+      !< Data checking
+      !-------------------------------------------------------------------------
       if (kini<=zero) then
         call ancmsg(msgid=1012,                                                &
                     msgtype=msgerror,                                          &
@@ -180,7 +186,7 @@
                       c1=titr)        
         endif
       endif
-      ! Default value for scale factors of c and Pb
+      !< Default value for scale factors of c and Pb
       if (cini == zero) then 
         call hm_get_floatv_dim('mat_coh0',fac_unit,is_available,lsubmodel,     &
                                unitab    )
@@ -221,9 +227,9 @@
         muw0 = -one
       endif
 !
-!-------------------------------------------------------------------------------
-!     Filling buffer tables
-!------------------------------------------------------------------------------- 
+      !-------------------------------------------------------------------------
+      !< Filling buffer tables
+      !-------------------------------------------------------------------------
       !< Number of integer material parameters
       matparam%niparam = 1
       !< Number of real material parameters
@@ -268,14 +274,16 @@
       parmat(16) = 2
       parmat(17) = two*gini/(kini + four_over_3*gini) 
 !
-      !< PM table
+      !< Reference and initial density
       if (rhor == zero) rhor = rho0
       matparam%rho  = rhor
       matparam%rho0 = rho0
 !
-      !< MTAG variable activation
+      !< Standard variables table size
+      ! -> Equivalent stress
       mtag%g_seq = 1
       mtag%l_seq = 1
+      ! -> Equivalent plastic strain (1 - deviatoric, 2 - volumetric)
       mtag%g_pla = 2
       mtag%l_pla = 2
 !
@@ -291,9 +299,9 @@
       call init_mat_keyword(matparam,"HYDRO_EOS") 
       call init_mat_keyword(matparam,"ISOTROPIC") 
 !
-!-------------------------------------------------------------------------------
-!     Parameters printout
-!-------------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
+      !< - Parameters printing in output listing
+      !-------------------------------------------------------------------------
       write(iout,1000) trim(titr),mat_id,ilaw
       write(iout,1100)
       if (is_encrypted) then

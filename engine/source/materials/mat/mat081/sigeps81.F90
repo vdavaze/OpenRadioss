@@ -109,7 +109,6 @@
             deri,epspd,epspv,depspd,depspv,dcdepspd,dpbdepspv,dpadepspv,f,     &
             p,sxx,syy,szz,sxy,syz,szx,pu,rc,a,dpxx,dpyy,dpzz,dpxy,dpyz,dpzx,   &
             muw,u,dudmu,por
-
 !=============================================================================== 
 !
           !=====================================================================
@@ -313,11 +312,17 @@
               endif
             !< Tri-traction treatment (apex of the yield surface)
             else
+              depspv(i) = -(p(i) + (c(i)/tgphi))/k(i)
+              if (soft_flag == 1) then
+                epspv(i) = epspv(i) + max(depspv(i),zero)
+              else
+                epspv(i) = epspv(i) + depspv(i)
+              endif
               p(i) = -c(i)/tgphi
               seq(i) = zero
-              signxx(i) = -third*p(i)
-              signyy(i) = -third*p(i)
-              signzz(i) = -third*p(i)
+              signxx(i) = -p(i)
+              signyy(i) = -p(i)
+              signzz(i) = -p(i)
               signxy(i) = zero
               signyz(i) = zero
               signzx(i) = zero
@@ -355,7 +360,6 @@
                 dseqdsigxy =      three*sxy(i)/max(seq(i),em20)
                 dseqdsigyz =      three*syz(i)/max(seq(i),em20)
                 dseqdsigzx =      three*szx(i)/max(seq(i),em20)
-                ! write(*,*) "dsigeqdsig = ", dseqdsigxx, dseqdsigyy, dseqdsigzz, dseqdsigxy, dseqdsigyz, dseqdsigzx
 !
                 !< Derivative of hydrostatic pressure w.r.t stress tensor
                 dpdsigxx = -third
@@ -364,7 +368,6 @@
                 dpdsigxy =   zero
                 dpdsigyz =   zero
                 dpdsigzx =   zero
-                ! write(*,*) "dpdsig = ", dpdsigxx, dpdsigyy, dpdsigzz, dpdsigxy, dpdsigyz, dpdsigzx
 !
                 !< Derivative of yield criterion with respect to pressure and 
                 !  Von Mises stress
@@ -374,7 +377,6 @@
                   dfdp  = dfdp - drcdp*a(i)
                 endif
                 dfdseq = one
-                ! write(*,*) "dfdp = ", dfdp, dfdseq, rc(i), pb(i), pa(i), p(i)
 !
                 !< Derivative of plastic potential with respect to pressure and 
                 !  Von Mises stress
@@ -386,7 +388,13 @@
                   dgdp = dfdp
                 endif  
                 dgdseq = one
-                ! write(*,*) "dgdp = ", dgdp, dgdseq
+!
+                !< Check if maximum dilatancy is reached 
+                !  (maximum dilatancy always negative)
+                if (rho(i) <= (one + max_dilat)*rho0(i)) then
+                  dgdp = max(zero,dgdp)
+                  dfdp = max(zero,dfdp)
+                endif
 !
                 !< Assembling derivative of yield criterion w.r.t stress tensor
                 dfdsigxx = dfdseq*dseqdsigxx + dfdp*dpdsigxx
@@ -395,7 +403,6 @@
                 dfdsigxy = dfdseq*dseqdsigxy + dfdp*dpdsigxy
                 dfdsigyz = dfdseq*dseqdsigyz + dfdp*dpdsigyz
                 dfdsigzx = dfdseq*dseqdsigzx + dfdp*dpdsigzx
-                ! write(*,*) "dfdsig = ", dfdsigxx, dfdsigyy, dfdsigzz, dfdsigxy, dfdsigyz, dfdsigzx
 !
                 !< Assembling derivative of plastic potential w.r.t stress tensor
                 dgdsigxx = dgdseq*dseqdsigxx + dgdp*dpdsigxx
@@ -404,7 +411,6 @@
                 dgdsigxy = dgdseq*dseqdsigxy + dgdp*dpdsigxy
                 dgdsigyz = dgdseq*dseqdsigyz + dgdp*dpdsigyz
                 dgdsigzx = dgdseq*dseqdsigzx + dgdp*dpdsigzx
-                ! write(*,*) "dgdsig = ", dgdsigxx, dgdsigyy, dgdsigzz, dgdsigxy, dgdsigyz, dgdsigzx
 !
                 !< Derivative of stress tensor w.r.t plastic multiplier
                 trdgpds    = dgdsigxx + dgdsigyy + dgdsigzz  
@@ -432,7 +438,6 @@
                   drcdpa = zero
                   drcdpb = zero
                 endif
-                ! write(*,*) "drc = ", drcdpa, drcdpb, p(i), pa(i)
 !
                 !< 3 - Derivative of yield criterion w.r.t material cohesion
                 !---------------------------------------------------------------
@@ -446,7 +451,6 @@
                                signyz(i)*dgdsigyz + signzx(i)*dgdsigzx)        &
                                /max(seq(i),em20)
                 depspv_dlam = dgdsigxx + dgdsigyy + dgdsigzz
-                ! write(*,*) "deps = ", depspd_dlam, depspv_dlam
 !
                 !< 5 - Derivative of yield criterion w.r.t plastic multiplier
                 !--------------------------------------------------------------- 
@@ -455,16 +459,10 @@
                            dfdrc*drcdpb*dpbdepspv(i)*depspv_dlam +             &
                            dfdc*dcdepspd(i)*depspd_dlam
                 df_dlam = sign(max(abs(df_dlam),em20),df_dlam)
-                ! write(*,*) "dfdsig_dsigdlam = ", dfdsig_dsigdlam
-                ! write(*,*) "lign1 = ", dfdrc*drcdpa*dpadepspv(i)*depspv_dlam
-                ! write(*,*) "lign2 = ", dfdrc*drcdpb*dpbdepspv(i)*depspv_dlam
-                ! write(*,*) "lign3 = ", dfdc*dcdepspd(i)*depspd_dlam
-                ! write(*,*) "dfdlam = ", df_dlam
 !
                 !< 6 - Computation of plastic multiplier
                 !---------------------------------------------------------------             
                 dlam = -f(i)/df_dlam
-                ! write(*,*) "dlam = ", dlam
 !
                 !< 7 - Update plastic strain related variables
                 !--------------------------------------------------------------- 
@@ -482,11 +480,9 @@
                 else
                   epspv(i) = epspv(i) + depspv(i)
                 endif
-                ! write(*,*) "epspv_iter = ", epspv(i)
                 !< Deviatoric plastic strain update
                 depspd(i) = max(depspd(i) + depspd_dlam*dlam,zero)
                 epspd(i)  = epspd(i)  + depspd(i)
-                ! write(*,*) "epspd_iter = ", epspd(i)
 ! 
                 !< 8 - Update stress tensor, pressure and Von Mises stress
                 !---------------------------------------------------------------
@@ -497,7 +493,6 @@
                 signxy(i) = signxy(i) -   g(i)*dpxy(i)
                 signyz(i) = signyz(i) -   g(i)*dpyz(i)
                 signzx(i) = signzx(i) -   g(i)*dpzx(i)
-                ! write(*,*) "sign_iter = ", signxx(i), signyy(i), signzz(i), signxy(i), signyz(i), signzx(i)
 !
                 !< New deviatoric stress tensor
                 p(i)   = -(signxx(i) + signyy(i) + signzz(i))/three
@@ -507,14 +502,11 @@
                 sxy(i) = signxy(i)
                 syz(i) = signyz(i)
                 szx(i) = signzx(i)
-                ! write(*,*) 'pressure_iter = ', p(i)
-                ! write(*,*) 'sxx_iter = ', sxx(i),syy(i),szz(i),sxy(i),syz(i),szx(i)
 !
                 !< New Von Mises stress
                 seq(i) = three_half*(sxx(i)**2 + syy(i)**2 + szz(i)**2)        &
                        +      three*(sxy(i)**2 + syz(i)**2 + szx(i)**2)
                 seq(i) = sqrt(seq(i))
-                ! write(*,*) 'seq_iter = ', seq(i)
 !
               enddo 
 !
@@ -581,13 +573,10 @@
                   rc(i) = one - ((p(i)-pa(i))/(pb(i)-pa(i)))**2
                   rc(i) = sqrt(max(rc(i),zero))
                 endif
-                ! write(*,*) "rc_iter = ", rc(i)
                 !< Pressure dependent factor
                 a(i) = max(zero,p(i)*tgphi + c(i))
-                ! write(*,*) "a_iter = ", a(i)
                 !< New yield function value
                 f(i) = seq(i) - rc(i)*a(i)
-                ! write(*,*) "f_iter = ", f(i), iter
               enddo
             enddo      
           endif
