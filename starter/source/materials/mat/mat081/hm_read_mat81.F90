@@ -119,9 +119,6 @@
       max_dilat = -abs(max_dilat)
       !< Porosity related parameters
       if (kwater == zero)  kwater  = one
-      if (por0 == zero)    por0    = zero
-      if (sat0 == zero)    sat0    = zero
-      if (u0 == zero)      u0      = zero
       if (tol == zero)     tol     = em04
       if (viscfac == zero) viscfac = half
 !
@@ -270,9 +267,9 @@
       matparam%nu    = (three*kini-two*gini)/(six*kini+two*gini)
 !
       !< PARMAT table
-      parmat(1)  = kini + four_over_3*gini
-      parmat(16) = 2
-      parmat(17) = two*gini/(kini + four_over_3*gini) 
+      parmat(1)  = matparam%bulk
+      parmat(2)  = matparam%young
+      parmat(3)  = matparam%nu
 !
       !< Reference and initial density
       if (rhor == zero) rhor = rho0
@@ -308,7 +305,7 @@
         write(iout,'(5x,a,//)')'CONFIDENTIAL DATA'
       else
         write(iout,1200) rho0
-        write(iout,1300) kini,gini,ifunc(1),ifunc(2)  
+        write(iout,1300) kini,gini,matparam%young,matparam%nu,ifunc(1),ifunc(2)  
         write(iout,1400) cini,capini,ifunc(3),ifunc(4),phi,psi
         write(iout,1500) alpha,max_dilat,epsvini,soft_flag
         write(iout,1600) kwater,por0,sat0,u0
@@ -330,6 +327,8 @@
        5X,'---------------------------------------------',/,                   &
        5X,'INITIAL BULK MODULUS (K0) . . . . . . . . . =',1PG20.13/,           &
        5X,'INITIAL SHEAR MODULUS (G0). . . . . . . . . =',1PG20.13/,           &
+       5X,'INITIAL YOUNG MODULUS (COMPUTED). . . . . . =',1PG20.13/,           &
+       5X,'INITIAL POISSON RATIO (COMPUTED). . . . . . =',1PG20.13/,           &
        5X,'BULK  MODULUS K SCALE FUNCTION ID . . . . . =',I10/,                &
        5X,'SHEAR MODULUS G SCALE FUNCTION ID . . . . . =',I10/)
  1400 FORMAT(/                                                                 &
