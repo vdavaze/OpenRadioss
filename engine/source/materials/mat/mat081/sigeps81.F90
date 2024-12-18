@@ -118,21 +118,21 @@
           !< Recovering integer model parameter
           soft_flag = matparam%iparam(1)  !< Softening flag
           !< Recovering real model paramter 
-          kini      = matparam%bulk       !< Initial bulk modulus
-          gini      = matparam%shear      !< Initial shear modulus
-          tgphi     = matparam%uparam(1)  !< Friction angle
-          tgpsi     = matparam%uparam(2)  !< Plastic flow potential angle
-          cini      = matparam%uparam(3)  !< Initial material cohesion
-          capini    = matparam%uparam(4)  !< Initial cap limit pressure
-          alpha     = matparam%uparam(5)  !< Ratio Pa/Pb
-          max_dilat = matparam%uparam(6)  !< Maximum dilatancy
-          epspvol0  = matparam%uparam(7)  !< Initial volumetric plastic strain
-          kwater    = matparam%uparam(8)  !< Pore water bulk modulus
-          por0      = matparam%uparam(9)  !< Initial porosity
-          sat0      = matparam%uparam(10) !< Initial saturation
-          u0        = matparam%uparam(11) !< Initial pore water pressure
-          tolmu     = matparam%uparam(12) !< Tolerance for capshift viscosity
-          viscfac   = matparam%uparam(13) !< Viscosity factor
+          kini      = matparam%uparam(1)  !< Initial bulk modulus or scl. factor
+          gini      = matparam%uparam(2)  !< Initial shear modulus or scl.factor
+          tgphi     = matparam%uparam(3)  !< Friction angle
+          tgpsi     = matparam%uparam(4)  !< Plastic flow potential angle
+          cini      = matparam%uparam(5)  !< Initial material cohesion
+          capini    = matparam%uparam(6)  !< Initial cap limit pressure
+          alpha     = matparam%uparam(7)  !< Ratio Pa/Pb
+          max_dilat = matparam%uparam(8)  !< Maximum dilatancy
+          epspvol0  = matparam%uparam(9)  !< Initial volumetric plastic strain
+          kwater    = matparam%uparam(10) !< Pore water bulk modulus
+          por0      = matparam%uparam(11) !< Initial porosity
+          sat0      = matparam%uparam(12) !< Initial saturation
+          u0        = matparam%uparam(13) !< Initial pore water pressure
+          tolmu     = matparam%uparam(14) !< Tolerance for capshift viscosity
+          viscfac   = matparam%uparam(15) !< Viscosity factor
 !
           !=====================================================================
           !< - RECOVERING USER VARIABLES AND STATE VARIABLES
@@ -250,7 +250,7 @@
           !< Tri-traction return mapping (apex of the yield surface)
           do i = 1,nel 
             if (p(i) <= -c(i)/tgphi) then
-              depspv(i) = -(p(i) + (c(i)/tgphi))/k(i)
+              depspv(i) = (p(i) + (c(i)/tgphi))/k(i)
               if (soft_flag == 1) depspv(i) = max(depspv(i),zero)
               epspv(i) = epspv0(i) + depspv(i)
               p(i) = -c(i)/tgphi
@@ -344,11 +344,11 @@
               do iter = 1, niter
                 do ii = 1, ntricomp
                   i = indxtricomp(ii)
-                  ddepspv = -(p(i) - pb(i))/(k(i) - dpbdepspv(i))
+                  ddepspv = -(p(i) - pb(i))/(-k(i) - dpbdepspv(i))
                   depspv(i) = depspv(i) + ddepspv
                   if (soft_flag == 1) depspv(i) = max(depspv(i),zero)
                   epspv(i) = epspv0(i) + depspv(i)
-                  p(i) = p(i) + k(i)*ddepspv
+                  p(i) = p(i) - k(i)*ddepspv
                 enddo
                 ipos(1:nel) = vartmp(1:nel,4)
                 iad(1:nel)  = npf(ifunc(4)) / 2 + 1
@@ -362,7 +362,7 @@
             else
               do ii = 1, ntricomp
                 i = indxtricomp(ii)
-                depspv(i) = -(p(i) - pb(i))/k(i)
+                depspv(i) = (p(i) - pb(i))/k(i)
                 if (soft_flag == 1) then
                   depspv(i) = max(depspv(i),zero)
                 endif
@@ -514,7 +514,7 @@
                                signzz(i)*dgdsigzz + signxy(i)*dgdsigxy +       &
                                signyz(i)*dgdsigyz + signzx(i)*dgdsigzx)        &
                                /max(seq(i),em20)
-                depspv_dlam = dgdsigxx + dgdsigyy + dgdsigzz
+                depspv_dlam = -(dgdsigxx + dgdsigyy + dgdsigzz)
 !
                 !< 5 - Derivative of yield criterion w.r.t plastic multiplier
                 !--------------------------------------------------------------- 
@@ -549,9 +549,9 @@
 ! 
                 !< 8 - Update stress tensor, pressure and Von Mises stress
                 !---------------------------------------------------------------
-                signxx(i) = signxx(i) - (g2(i)*dpxx + lame(i)*depspv(i))
-                signyy(i) = signyy(i) - (g2(i)*dpyy + lame(i)*depspv(i))
-                signzz(i) = signzz(i) - (g2(i)*dpzz + lame(i)*depspv(i))
+                signxx(i) = signxx(i) - (g2(i)*dpxx - lame(i)*depspv(i))
+                signyy(i) = signyy(i) - (g2(i)*dpyy - lame(i)*depspv(i))
+                signzz(i) = signzz(i) - (g2(i)*dpzz - lame(i)*depspv(i))
                 signxy(i) = signxy(i) -   g(i)*dpxy
                 signyz(i) = signyz(i) -   g(i)*dpyz
                 signzx(i) = signzx(i) -   g(i)*dpzx

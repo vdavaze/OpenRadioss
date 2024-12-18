@@ -97,7 +97,7 @@
       call hm_get_intv  ('FUN_A2'   ,ifunc(2) ,is_available, lsubmodel)
       call hm_get_intv  ('FUN_A3'   ,ifunc(3) ,is_available, lsubmodel)
       call hm_get_intv  ('FUN_A4'   ,ifunc(4) ,is_available, lsubmodel)
-      call hm_get_intv  ('IFLAG'    ,soft_flag,is_available, lsubmodel)
+      call hm_get_intv  ('Iflag'    ,soft_flag,is_available, lsubmodel)
 !< Card6
       call hm_get_floatv('MAT_KW'   ,kwater   ,is_available, lsubmodel, unitab)
       call hm_get_floatv('MAT_POR0' ,por0     ,is_available, lsubmodel, unitab)
@@ -230,7 +230,7 @@
       !< Number of integer material parameters
       matparam%niparam = 1
       !< Number of real material parameters
-      matparam%nuparam = 13
+      matparam%nuparam = 15
       !< Number of user variables 
       nuvar = 10
       !< Number of functions
@@ -246,19 +246,21 @@
       matparam%iparam(1)  = soft_flag
 !
       !< Real material parameters
-      matparam%uparam(1)  = tand(phi)
-      matparam%uparam(2)  = tand(psi)
-      matparam%uparam(3)  = cini
-      matparam%uparam(4)  = capini
-      matparam%uparam(5)  = alpha
-      matparam%uparam(6)  = max_dilat
-      matparam%uparam(7)  = epsvini
-      matparam%uparam(8)  = kwater
-      matparam%uparam(9)  = por0
-      matparam%uparam(10) = muw0 + one
-      matparam%uparam(11) = u0
-      matparam%uparam(12) = tol
-      matparam%uparam(13) = viscfac
+      matparam%uparam(1)  = kini
+      matparam%uparam(2)  = gini
+      matparam%uparam(3)  = tand(phi)
+      matparam%uparam(4)  = tand(psi)
+      matparam%uparam(5)  = cini
+      matparam%uparam(6)  = capini
+      matparam%uparam(7)  = alpha
+      matparam%uparam(8)  = max_dilat
+      matparam%uparam(9)  = epsvini
+      matparam%uparam(10) = kwater
+      matparam%uparam(11) = por0
+      matparam%uparam(12) = muw0 + one
+      matparam%uparam(13) = u0
+      matparam%uparam(14) = tol
+      matparam%uparam(15) = viscfac
 !
       !< Elastic parameters
       matparam%bulk  = kini
