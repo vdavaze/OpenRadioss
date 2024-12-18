@@ -1531,7 +1531,8 @@
             &de1     ,de2     ,de3     ,de4     ,de5     ,de6     ,&
             &so1     ,so2     ,so3     ,so4     ,so5     ,so6     ,&
             &s1      ,s2      ,s3      ,s4      ,s5      ,s6      ,&
-            &sv1     ,sv2     ,sv3     ,nvartmp ,vartmp  ,lbuf%seq)
+            &sv1     ,sv2     ,sv3     ,nvartmp ,vartmp  ,lbuf%seq,&
+            &et      )
 !
           elseif (mtn == 82) then
             call sigeps82(nel ,npar,nuvar,nfunc,ifunc,&

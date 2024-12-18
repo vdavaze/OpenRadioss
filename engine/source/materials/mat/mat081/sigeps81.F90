@@ -33,7 +33,8 @@
            depsxx  ,depsyy  ,depszz   ,depsxy   ,depsyz   ,depszx  ,           &
            sigoxx  ,sigoyy  ,sigozz   ,sigoxy   ,sigoyz   ,sigozx  ,           &
            signxx  ,signyy  ,signzz   ,signxy   ,signyz   ,signzx  ,           &
-           sigvxx  ,sigvyy  ,sigvzz   ,nvartmp  ,vartmp   ,seq     )
+           sigvxx  ,sigvyy  ,sigvzz   ,nvartmp  ,vartmp   ,seq     ,           &
+           et      )
 !-------------------------------------------------------------------------------
 !   M o d u l e s
 !-------------------------------------------------------------------------------
@@ -89,6 +90,7 @@
           integer, intent(in) :: nvartmp                       !< number of temporary variables
           integer, dimension(nel,nvartmp), intent(inout) :: vartmp !< temporary variables
           my_real, dimension(nel), intent(inout) :: seq        !< Von Mises equivalent stress
+          my_real, dimension(nel), intent(out) :: et           !< for hourglass stiffness
 !-------------------------------------------------------------------------------
 !  L o c a l   V a r i a b l e s
 !-------------------------------------------------------------------------------
@@ -104,11 +106,10 @@
             dpdsigxy,dpdsigyz,dpdsigzx,drcdpa,drcdpb,dseqdsigxx,dseqdsigyy,    &
             dseqdsigzz,dseqdsigxy,dseqdsigyz,dseqdsigzx,dsigxxdlam,dsigyydlam, &
             dsigzzdlam,dsigxydlam,dsigyzdlam,dsigzxdlam,drcdp,ldav,trdgpds,    &
-            fac
+            fac,ddepspv,ddepspd,dpxx,dpyy,dpzz,dpxy,dpyz,dpzx
           my_real, dimension(nel) :: k,g,lame,g2,c,pa,pb,p0,dcdepsp,dpbdepsp,  &
             deri,epspd,epspv,depspd,depspv,dcdepspd,dpbdepspv,dpadepspv,f,     &
-            p,sxx,syy,szz,sxy,syz,szx,pu,rc,a,dpxx,dpyy,dpzz,dpxy,dpyz,dpzx,   &
-            muw,u,dudmu,por
+            p,sxx,syy,szz,sxy,syz,szx,pu,rc,a,muw,u,dudmu,por,epspv0,epspd0  
 !=============================================================================== 
 !
           !=====================================================================
@@ -134,21 +135,15 @@
           viscfac   = matparam%uparam(13) !< Viscosity factor
 !
           !=====================================================================
-          !< - Recovering user variables and state variables
+          !< - RECOVERING USER VARIABLES AND STATE VARIABLES
           !=====================================================================
-          epspd(1:nel)  = defp(1:nel,1) !< Deviatoric Equivalent Plastic Strain  
-          epspv(1:nel)  = defp(1:nel,2) !< Volumetric Plastic Strain 
-          depspv(1:nel) = zero
-          depspd(1:nel) = zero
-          dpxx(1:nel)   = zero
-          dpyy(1:nel)   = zero
-          dpzz(1:nel)   = zero
-          dpxy(1:nel)   = zero
-          dpyz(1:nel)   = zero
-          dpzx(1:nel)   = zero
+          epspd0(1:nel) = defp(1:nel,1) !< Initial deviatoric plastic strain  
+          epspv0(1:nel) = defp(1:nel,2) !< Initial volumetric plastic ptrain 
+          epspd(1:nel)  = epspd0(1:nel) 
+          epspv(1:nel)  = epspv0(1:nel)
 !
           !=====================================================================
-          !< - Recovering elastic parameters
+          !< - RECOVERING ELASTIC PARAMETERS
           !=====================================================================
           !<  Bulk modulus computation
           !  -> Interpolated with volumetric plastic strain
@@ -180,55 +175,9 @@
           g2(1:nel) = two*g(1:nel)
           !< Lame coefficient
           lame(1:nel) = k(1:nel) - two_third*g(1:nel)
-!
-          !=====================================================================
-          !< - Yield criterion parameter computation
-          !=====================================================================
-          !< Material cohesion
-          !  -> Interpolated with deviatoric plastic strain
-          if (ifunc(3) > 0) then 
-            ipos(1:nel) = vartmp(1:nel,3)
-            iad(1:nel)  = npf(ifunc(3)) / 2 + 1
-            ilen(1:nel) = npf(ifunc(3)+1) / 2 - iad(1:nel) - ipos(1:nel)
-            call vinter2(tf,iad,ipos,ilen,nel,epspd,dcdepspd,c)
-            c(1:nel) = cini*c(1:nel)
-            dcdepspd(1:nel) = cini*dcdepspd(1:nel)
-            vartmp(1:nel,3) = ipos(1:nel)
-          !  -> Constant value
-          else
-            c(1:nel) = cini
-            dcdepspd(1:nel) = zero
-          endif
-          !< Cap limit pressure
-          !  -> Interpolated with volumetric plastic strain
-          if (ifunc(4) > 0) then
-            ipos(1:nel) = 1!vartmp(1:nel,4)
-            iad(1:nel)  = npf(ifunc(4)) / 2 + 1
-            ilen(1:nel) = npf(ifunc(4)+1) / 2 - iad(1:nel) - ipos(1:nel)
-            call vinter2(tf,iad,ipos,ilen,nel,epspv,dpbdepspv,pb)
-            pb(1:nel) = capini*pb(1:nel)
-            dpbdepspv(1:nel) = capini*dpbdepspv(1:nel)
-            vartmp(1:nel,4) = ipos(1:nel)
-          !  -> Constant value
-          else
-            pb(1:nel) = capini
-            dpbdepspv(1:nel) = zero
-          endif
-          !< Transition pressure yield surface to cap
-          pa(1:nel) = alpha*pb(1:nel)  
-          dpadepspv(1:nel) = alpha*dpbdepspv(1:nel)  
-          !< Null criterion derivative pressure (dfdp = 0)
-          do i = 1,nel
-            delta = (pa(i)*tgphi + c(i))**2 + eight*((pb(i)-pa(i))**2)*(tgphi**2)
-            if (tgphi > zero) then
-              p0(i) = pa(i) + (-(pa(i)*tgphi+c(i)) + sqrt(delta))/(four*tgphi)
-            else
-              p0(i) = pa(i)
-            endif
-          enddo
 ! 
           !=====================================================================
-          !< - Computation of trial stress tensor, Von Mises and pressure
+          !< - COMPUTATION OF TRIAL STRESS TENSOR, VON MISES AND PRESSURE
           !=====================================================================
           do i=1,nel
             !< Trial Cauchy stress tensor
@@ -256,7 +205,7 @@
           enddo
 !
           !=====================================================================
-          !< - Porosity computation (if activated)
+          !< - POROSITY COMPUTATION (IF ACTIVATED)
           !=====================================================================
           if (sat0 > zero) then
             do i = 1,nel
@@ -279,12 +228,75 @@
             u(1:nel)     = zero
             dudmu(1:nel) = zero
           endif 
+!
+          !=====================================================================
+          !< - YIELD CRITERION VARIABLES COMPUTATION
+          !=====================================================================
+          !< Material cohesion
+          !  -> Interpolated with deviatoric plastic strain
+          if (ifunc(3) > 0) then 
+            ipos(1:nel) = vartmp(1:nel,3)
+            iad(1:nel)  = npf(ifunc(3)) / 2 + 1
+            ilen(1:nel) = npf(ifunc(3)+1) / 2 - iad(1:nel) - ipos(1:nel)
+            call vinter2(tf,iad,ipos,ilen,nel,epspd,dcdepspd,c)
+            c(1:nel) = cini*c(1:nel)
+            dcdepspd(1:nel) = cini*dcdepspd(1:nel)
+            vartmp(1:nel,3) = ipos(1:nel)
+          !  -> Constant value
+          else
+            c(1:nel) = cini
+            dcdepspd(1:nel) = zero
+          endif
+          !< Tri-traction return mapping (apex of the yield surface)
+          do i = 1,nel 
+            if (p(i) <= -c(i)/tgphi) then
+              depspv(i) = -(p(i) + (c(i)/tgphi))/k(i)
+              if (soft_flag == 1) depspv(i) = max(depspv(i),zero)
+              epspv(i) = epspv0(i) + depspv(i)
+              p(i) = -c(i)/tgphi
+              signxx(i) = sxx(i) - p(i)
+              signyy(i) = syy(i) - p(i)
+              signzz(i) = szz(i) - p(i)
+            endif
+          enddo
+!
+          !< Cap limit pressure
+          !  -> Interpolated with volumetric plastic strain
+          if (ifunc(4) > 0) then
+            ipos(1:nel) = vartmp(1:nel,4)
+            iad(1:nel)  = npf(ifunc(4)) / 2 + 1
+            ilen(1:nel) = npf(ifunc(4)+1) / 2 - iad(1:nel) - ipos(1:nel)
+            call vinter2(tf,iad,ipos,ilen,nel,epspv,dpbdepspv,pb)
+            pb(1:nel) = capini*pb(1:nel)
+            dpbdepspv(1:nel) = capini*dpbdepspv(1:nel)
+            vartmp(1:nel,4) = ipos(1:nel)
+          !  -> Constant value
+          else
+            pb(1:nel) = capini
+            dpbdepspv(1:nel) = zero
+          endif
+          !< Transition pressure yield surface to cap
+          pa(1:nel) = alpha*pb(1:nel)  
+          dpadepspv(1:nel) = alpha*dpbdepspv(1:nel)  
+          !< Null criterion derivative pressure (dfdp = 0)
+          do i = 1,nel
+            delta = (pa(i)*tgphi + c(i))**2 + eight*((pb(i)-pa(i))**2)*(tgphi**2)
+            if (tgphi > zero) then
+              p0(i) = pa(i) + (-(pa(i)*tgphi+c(i)) + sqrt(delta))/(four*tgphi)
+            else
+              p0(i) = pa(i)
+            endif
+          enddo
 !    
           !=====================================================================
-          ! - Computation of yield function and check element behavior
+          !< - COMPUTATION OF YIELD FUNCTION AND CHECK ELEMENT BEHAVIOR
           !=====================================================================
+          !< Initialisation of the element indexes
           ntricomp = 0
           indxtricomp(1:nel) = 0
+          nindx = 0
+          indx(1:nel) = 0
+! 
           !< Preliminary computation to know the location: 
           ! - on the yield surface
           ! - on the cap hardening surface
@@ -297,19 +309,6 @@
             else
               pu(i) = p(i) - u(i)
             endif
-            !< Tri-traction treatment (apex of the yield surface)
-            if (p(i) <= -c(i)/tgphi) then
-              depspv(i) = -(p(i) + (c(i)/tgphi))/k(i)
-              if (soft_flag == 1) then
-                epspv(i) = epspv(i) + max(depspv(i),zero)
-              else
-                epspv(i) = epspv(i) + depspv(i)
-              endif
-              p(i) = -c(i)/tgphi
-              signxx(i) = sxx(i) - p(i)
-              signyy(i) = syy(i) - p(i)
-              signzz(i) = szz(i) - p(i)
-            endif 
             !< Transition surface to cap hardening factor
             if (p(i)<=pa(i)) then
               rc(i) = one
@@ -321,53 +320,8 @@
               rc(i) = one - ((p(i)-pa(i))/(pb(i)-pa(i)))**2
               rc(i) = sqrt(max(rc(i),zero))
             endif 
-          enddo 
 !
-          !< Cap pressure correction in Tri-compression
-          if (ntricomp > 0) then
-            !< Non-linear tabulated cap pressure 
-            if (ifunc(4) > 0) then 
-              !< Cutting plane algorithm to compute the cap pressure
-              do iter = 1, niter
-                do ii = 1, ntricomp
-                  i = indxtricomp(ii)
-                  depspv(i) = (p(i) - pb(i))/(k(i) + dpbdepspv(i))
-                  epspv(i)  = epspv(i) + depspv(i)
-                  p(i) = p(i) - k(i)*depspv(i)
-                enddo
-                ipos(1:nel) = 1!vartmp(1:nel,4)
-                iad(1:nel)  = npf(ifunc(4)) / 2 + 1
-                ilen(1:nel) = npf(ifunc(4)+1) / 2 - iad(1:nel) - ipos(1:nel)
-                call vinter2(tf,iad,ipos,ilen,nel,epspv,dpbdepspv,pb)
-                pb(1:nel) = capini*pb(1:nel)
-                dpbdepspv(1:nel) = capini*dpbdepspv(1:nel)
-                vartmp(1:nel,4) = ipos(1:nel)
-                pa(1:nel) = alpha*pb(1:nel)
-                dpadepspv(1:nel) = alpha*dpbdepspv(1:nel)    
-              enddo
-            !< Constant cap pressure
-            else
-              do ii = 1, ntricomp
-                i = indxtricomp(ii)
-                depspv(i) = (p(i) - pb(i))/k(i)
-                epspv(i)  = epspv(i) + depspv(i)
-                p(i)      = pb(i)
-              enddo
-            endif
-            !< Apply update of the hydtostatic stress
-            do ii = 1,ntricomp
-              i = indxtricomp(ii)
-              signxx(i) = sxx(i) - p(i)
-              signyy(i) = syy(i) - p(i)
-              signzz(i) = szz(i) - p(i)
-            enddo 
-          endif  
-!
-          !< Check regular and tri-traction yield condition
-          nindx = 0
-          indx(1:nel) = 0
-          do i = 1,nel
-            !< Pressure dependent factor
+            !< Check the yield condition
             a(i) = max(zero,p(i)*tgphi + c(i))
             f(i) = seq(i) - rc(i)*a(i)
             if (f(i) >= zero) then 
@@ -377,9 +331,73 @@
           enddo
 !
           !=====================================================================
-          ! - PLASTIC CORRECTION WITH CUTTING PLANE (NEWTON-ITERATION) METHOD
+          ! - RETURN MAPPING PROCEDURES (PLASTIC CORRECTION)
           !=====================================================================
+!
+          !< Tri-compression return mapping (cap hardening)
+          if (ntricomp > 0) then
+            epspv0(1:nel) = epspv(1:nel)
+            !< Non-linear tabulated cap pressure 
+            if (ifunc(4) > 0) then 
+              depspv(1:nel) = zero
+              !< Cutting plane algorithm to compute the cap pressure
+              do iter = 1, niter
+                do ii = 1, ntricomp
+                  i = indxtricomp(ii)
+                  ddepspv = -(p(i) - pb(i))/(k(i) - dpbdepspv(i))
+                  depspv(i) = depspv(i) + ddepspv
+                  if (soft_flag == 1) depspv(i) = max(depspv(i),zero)
+                  epspv(i) = epspv0(i) + depspv(i)
+                  p(i) = p(i) + k(i)*ddepspv
+                enddo
+                ipos(1:nel) = vartmp(1:nel,4)
+                iad(1:nel)  = npf(ifunc(4)) / 2 + 1
+                ilen(1:nel) = npf(ifunc(4)+1) / 2 - iad(1:nel) - ipos(1:nel)
+                call vinter2(tf,iad,ipos,ilen,nel,epspv,dpbdepspv,pb)
+                pb(1:nel) = capini*pb(1:nel)
+                dpbdepspv(1:nel) = capini*dpbdepspv(1:nel)
+                vartmp(1:nel,4) = ipos(1:nel)
+              enddo
+            !< Constant cap pressure
+            else
+              do ii = 1, ntricomp
+                i = indxtricomp(ii)
+                depspv(i) = -(p(i) - pb(i))/k(i)
+                if (soft_flag == 1) then
+                  depspv(i) = max(depspv(i),zero)
+                endif
+                epspv(i) = epspv0(i) + depspv(i)
+                p(i) = pb(i)
+              enddo
+            endif
+            !< Update corresponding variables Apply 
+            do ii = 1,ntricomp
+              i = indxtricomp(ii)
+              !< Update transition pressure yield surface to cap
+              pa(i) = alpha*pb(i)  
+              dpadepspv(i) = alpha*dpbdepspv(i)  
+              !< Update null criterion derivative pressure (dfdp = 0)
+              delta = (pa(i)*tgphi + c(i))**2 + eight*((pb(i)-pa(i))**2)*(tgphi**2)
+              if (tgphi > zero) then
+                p0(i) = pa(i) + (-(pa(i)*tgphi+c(i)) + sqrt(delta))/(four*tgphi)
+              else
+                p0(i) = pa(i)
+              endif
+              !< Update of the hydtostatic stress
+              signxx(i) = sxx(i) - p(i)
+              signyy(i) = syy(i) - p(i)
+              signzz(i) = szz(i) - p(i)
+            enddo 
+          endif  
+
+          !< Regular return mapping (yield surface) 
+          !< Cutting plane algorithm to compute the plastic correction
           if (nindx > 0) then
+            !< Initialisation of the plastic correction
+            depspv(1:nel) = zero
+            depspd(1:nel) = zero
+            epspv0(1:nel) = epspv(1:nel)
+!
             !< Loop over the iterations   
             do iter = 1, niter
               !< Loop over yielding elements
@@ -504,7 +522,7 @@
                            dfdrc*drcdpa*dpadepspv(i)*depspv_dlam +             &
                            dfdrc*drcdpb*dpbdepspv(i)*depspv_dlam +             &
                            dfdc*dcdepspd(i)*depspd_dlam
-                df_dlam = sign(max(abs(df_dlam),em20),df_dlam)
+                df_dlam = sign(min(max(abs(df_dlam),em20),ep20),df_dlam)
 !
                 !< 6 - Computation of plastic multiplier
                 !---------------------------------------------------------------             
@@ -513,37 +531,31 @@
                 !< 7 - Update plastic strain related variables
                 !--------------------------------------------------------------- 
                 !< Plastic strain tensor increment (on the current iteration)
-                dpxx(i) = dlam * dgdsigxx
-                dpyy(i) = dlam * dgdsigyy
-                dpzz(i) = dlam * dgdsigzz
-                dpxy(i) = dlam * dgdsigxy
-                dpyz(i) = dlam * dgdsigyz
-                dpzx(i) = dlam * dgdsigzx
+                dpxx = dlam * dgdsigxx
+                dpyy = dlam * dgdsigyy
+                dpzz = dlam * dgdsigzz
+                dpxy = dlam * dgdsigxy
+                dpyz = dlam * dgdsigyz
+                dpzx = dlam * dgdsigzx
                 !< Deviatoric plastic strain update
-                depspd(i) = depspd_dlam*dlam
-                epspd(i)  = epspd(i) + depspd(i)
+                ddepspd   = depspd_dlam*dlam
+                depspd(i) = depspd(i) + ddepspd
+                epspd(i)  = epspd0(i) + max(depspd(i),zero)
                 !< Volumetric plastic strain update
-                if (rc(i) > zero) then 
-                  depspv(i) = depspv_dlam*dlam
-                else
-                  depspv(i) = (p(i)-pb(i))/(k(i) + dpbdepspv(i))
-                endif
-                if (soft_flag == 1) then
-                  epspv(i) = epspv(i) + max(depspv(i),zero)
-                else
-                  epspv(i) = epspv(i) + depspv(i)
-                endif
+                ddepspv = depspv_dlam*dlam
+                depspv(i) = depspv(i) + ddepspv
+                if (soft_flag == 1) depspv(i) = max(depspv(i),zero)
+                epspv(i) = epspv0(i) + depspv(i)
 ! 
                 !< 8 - Update stress tensor, pressure and Von Mises stress
                 !---------------------------------------------------------------
-                signxx(i) = signxx(i) - (g2(i)*dpxx(i) + lame(i)*depspv(i))
-                signyy(i) = signyy(i) - (g2(i)*dpyy(i) + lame(i)*depspv(i))
-                signzz(i) = signzz(i) - (g2(i)*dpzz(i) + lame(i)*depspv(i))
-                signxy(i) = signxy(i) -   g(i)*dpxy(i)
-                signyz(i) = signyz(i) -   g(i)*dpyz(i)
-                signzx(i) = signzx(i) -   g(i)*dpzx(i)
+                signxx(i) = signxx(i) - (g2(i)*dpxx + lame(i)*depspv(i))
+                signyy(i) = signyy(i) - (g2(i)*dpyy + lame(i)*depspv(i))
+                signzz(i) = signzz(i) - (g2(i)*dpzz + lame(i)*depspv(i))
+                signxy(i) = signxy(i) -   g(i)*dpxy
+                signyz(i) = signyz(i) -   g(i)*dpyz
+                signzx(i) = signzx(i) -   g(i)*dpzx
 !
-                !< New deviatoric stress tensor
                 p(i)   = -(signxx(i) + signyy(i) + signzz(i))/three
                 sxx(i) = signxx(i) + p(i)
                 syy(i) = signyy(i) + p(i)
@@ -574,7 +586,7 @@
 !
               !< Update cap limit pressure
               if (ifunc(4) > 0) then
-                ipos(1:nel) = 1!vartmp(1:nel,4)
+                ipos(1:nel) = vartmp(1:nel,4)
                 iad(1:nel)  = npf(ifunc(4)) / 2 + 1
                 ilen(1:nel) = npf(ifunc(4)+1) / 2 - iad(1:nel) - ipos(1:nel)
                 call vinter2(tf,iad,ipos,ilen,nel,epspv,dpbdepspv,pb)
@@ -635,9 +647,6 @@
           !< Update porosity variable
           if (sat0 > zero) then
             do i=1,nel
-              uvar(i,5) = u(i)   ! cap shift
-              uvar(i,6) = por(i)
-              uvar(i,5) = muw(i) + one
               !< pore pressure is calculated here
               if (muw(i) >  zero) then
                 u(i) = kwater*muw(i)
@@ -657,7 +666,7 @@
               sigvxx(i) = -u(i)
               sigvyy(i) = -u(i)
               sigvzz(i) = -u(i)
-              uvar(i,3) = u(i)
+              uvar(i,7) = u(i)
             enddo
           endif
 !
@@ -677,6 +686,8 @@
             defp(1:nel,2) = epspv(1:nel) !< Volumetric Plastic Strain  
             !< Sound speed in the material
             soundsp(i) = sqrt((k(i) + four_over_3*g(i) + dudmu(i))/rho0(i))
+            !< Coefficient for hourglass 
+            et(i) = one
           enddo 
 !
         end subroutine sigeps81
