@@ -139,6 +139,10 @@
           if ((uvar(1,2) == zero).and.(matparam%uparam(9) /= zero)) THEN  
             defp(1:nel,2) = matparam%uparam(9)
           endif
+          ! !< Initialization of the porosity
+          ! if ((uvar(1,8) == zero).and.(matparam%uparam(11) /= zero)) THEN  
+          !   uvar(1:nel,8) = matparam%uparam(11)
+          ! endif
 !
           !=====================================================================
           !< - RECOVERING USER VARIABLES AND STATE VARIABLES
@@ -222,8 +226,9 @@
             do i = 1,nel
               !< Compute porosity according to volumetric plastic strain
               por(i) = one - (one - por0)*exp(epspv(i) - epspvol0)
+              por(i) = max(por(i),por0)
               !< Compute water volume fraction
-              muw(i) = (sat0/max(por(i)/por0,em20))*amu(i)
+              muw(i) = (sat0*por0/max(por(i),em20))*amu(i)
               !< Compute pore water pressure and its derivative
               if (muw(i) >= tolmu) then
                 u(i) = kwater*muw(i)
@@ -382,7 +387,8 @@
                 !< Update pore water pressure (if activated)
                 if (sat0 > zero) then
                   por(i) = one - (one - por0)*exp(epspv(i) - epspvol0)
-                  muw(i) = (sat0/max(por(i)/por0,em20))*amu(i)
+                  por(i) = max(por(i),por0)
+                  muw(i) = (sat0*por0/max(por(i),em20))*amu(i)
                   !< Compute pore water pressure and its derivative
                   if (muw(i) >= tolmu) then
                     u(i) = kwater*muw(i)
@@ -641,7 +647,8 @@
                 !< Update pore water pressure (if activated)
                 if (sat0 > zero) then
                   por(i) = one - (one - por0)*exp(epspv(i) - epspvol0)
-                  muw(i) = (sat0/max(por(i)/por0,em20))*amu(i)
+                  por(i) = max(por(i),por0)
+                  muw(i) = (sat0*por0/max(por(i),em20))*amu(i)
                   !< Compute pore water pressure and its derivative
                   if (muw(i) >= tolmu) then
                     u(i) = kwater*muw(i)
@@ -742,11 +749,11 @@
           !=====================================================================
 !
           !< Update porosity variable
-          if ((sat0 > zero).and.(1 == 2)) then
+          if (sat0 > zero) then
             do i=1,nel
               viscmax(i) = zero
               !< fp_poro adding viscosity close to saturation
-              if (muw(i) > -tolmu) then 
+              if ((muw(i) > -tolmu).and.(1 == 2)) then 
                 viscmax(i) = viscfac*(sqrt(kwater*rho(i))*volume(i)**third)
                 u(i) = u(i) - viscmax(i)*(depsxx(i)+depsyy(i)+depszz(i))/dt1
               endif 
@@ -755,7 +762,6 @@
               sigvxx(i) = -u(i)
               sigvyy(i) = -u(i)
               sigvzz(i) = -u(i)
-              uvar(i,7) = u(i)
             enddo
           endif
 !

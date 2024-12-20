@@ -114,11 +114,18 @@
       if (alpha == zero) alpha = half
       alpha = min(alpha,one)
       alpha = max(alpha,zero)
+      !< Friction angle
+      phi = max(phi,zero)
+      phi = min(phi,89.0d0)
+      !< Flow angle
+      psi = max(psi,zero)
+      psi = min(psi,89.0d0)
       !< Maximum dilatancy
       if (max_dilat == zero) max_dilat = -infinity
       max_dilat = -abs(max_dilat)
       !< Porosity related parameters
-      if (kwater == zero)  kwater  = one
+      sat0 = min(sat0,one)
+      sat0 = max(sat0,zero)
       if (tol == zero)     tol     = em04
       if (viscfac == zero) viscfac = half
 !
@@ -139,50 +146,6 @@
                     i1=mat_id,                                                 &
                     c1=titr)
       endif
-      if (ifunc(1) == 0) then
-        call ancmsg(msgid=1014,                                                &
-                    msgtype=msgwarning,                                        &
-                    anmode=aninfo,                                             &
-                    i1=mat_id,                                                 &
-                    c1=titr)
-      endif
-      if (ifunc(2) == 0) then
-        call ancmsg(msgid=1015,                                                &
-                    msgtype=msgwarning,                                        &
-                    anmode=aninfo,                                             &
-                    i1=mat_id,                                                 &
-                    c1=titr)
-      endif
-      if (ifunc(3) == 0) then
-        if (cini == zero) then 
-          call ancmsg(msgid=1713,                                              &
-                      msgtype=msgerror,                                        &
-                      anmode=aninfo_blind_1,                                   &
-                      i1=mat_id,                                               &
-                      c1=titr)         
-        else
-          call ancmsg(msgid=1016,                                              &
-                      msgtype=msgwarning,                                      &
-                      anmode=aninfo,                                           &
-                      i1=mat_id,                                               &
-                      c1=titr)
-        endif
-      endif
-      if (ifunc(4) == 0) then
-        if (capini == zero) then 
-          call ancmsg(msgid=1714,                                              &
-                      msgtype=msgerror,                                        &
-                      anmode=aninfo_blind_1,                                   &
-                      i1=mat_id,                                               &
-                      c1=titr)         
-        else
-          call ancmsg(msgid=1017,                                              &
-                      msgtype=msgwarning,                                      &
-                      anmode=aninfo,                                           &
-                      i1=mat_id,                                               &
-                      c1=titr)        
-        endif
-      endif
       !< Default value for scale factors of c and Pb
       if (cini == zero) then 
         call hm_get_floatv_dim('mat_coh0',fac_unit,is_available,lsubmodel,     &
@@ -193,6 +156,11 @@
         call hm_get_floatv_dim('mat_pb0',fac_unit,is_available,lsubmodel,      &
                               unitab    )
         capini = one*fac_unit
+      endif
+      if (kwater == zero) then 
+        call hm_get_floatv_dim('MAT_KW',fac_unit,is_available,lsubmodel,     &
+                               unitab   )
+        kwater = one*fac_unit
       endif
       if (sat0 /= zero) then
         if (kwater <= zero) then
@@ -307,11 +275,30 @@
         write(iout,'(5x,a,//)')'CONFIDENTIAL DATA'
       else
         write(iout,1200) rho0
-        write(iout,1300) kini,gini,matparam%young,matparam%nu,ifunc(1),ifunc(2)  
-        write(iout,1400) cini,capini,ifunc(3),ifunc(4),phi,psi
-        write(iout,1500) alpha,max_dilat,epsvini,soft_flag
-        write(iout,1600) kwater,por0,sat0,u0
-        write(iout,1700) tol,viscfac
+        write(iout,1300)
+        if (ifunc(1) > 0) then 
+          write(iout,1310) ifunc(1),kini
+        else
+          write(iout,1320) kini
+        endif
+        if (ifunc(2) > 0) then 
+          write(iout,1330) ifunc(2),gini
+        else
+          write(iout,1340) gini
+        endif
+        write(iout,1400)
+        if (ifunc(3) > 0) then 
+          write(iout,1410) ifunc(3),cini
+        else
+          write(iout,1420) cini
+        endif
+        if (ifunc(4) > 0) then 
+          write(iout,1430) ifunc(4),capini
+        else
+          write(iout,1440) capini
+        endif
+        write(iout,1450) phi,psi,alpha,max_dilat,soft_flag
+        write(iout,1500) epsvini,kwater,por0,sat0,u0,tol,viscfac 
       endif     
 !-------------------------------------------------------------------------------
  1000 format(/                                                                 &
@@ -322,45 +309,52 @@
        5X,'-----------------------------------------------------',/,           &
        5X,'  MATERIAL MODEL: DRUCKER-PRAGER WITH CAP HARDENING  ',/,           &
        5X,'-----------------------------------------------------',/)
- 1200 FORMAT(/                                                                 &
+ 1200 format(/                                                                 &
        5X,'INITIAL DENSITY  . . . . . . . . . . . . . .=',1PG20.13/)  
- 1300 FORMAT(/                                                                 &
+ 1300 format(/                                                                 &
        5X,'ELASTIC PARAMETERS:                          ',/,                   &
-       5X,'---------------------------------------------',/,                   &
-       5X,'INITIAL BULK MODULUS (K0) . . . . . . . . . =',1PG20.13/,           &
-       5X,'INITIAL SHEAR MODULUS (G0). . . . . . . . . =',1PG20.13/,           &
-       5X,'INITIAL YOUNG MODULUS (COMPUTED). . . . . . =',1PG20.13/,           &
-       5X,'INITIAL POISSON RATIO (COMPUTED). . . . . . =',1PG20.13/,           &
-       5X,'BULK  MODULUS K SCALE FUNCTION ID . . . . . =',I10/,                &
-       5X,'SHEAR MODULUS G SCALE FUNCTION ID . . . . . =',I10/)
- 1400 FORMAT(/                                                                 &
+       5X,'---------------------------------------------',/)
+ 1310 format(/                                                                 &
+       5X,'BULK MODULUS K SCALE FUNCTION ID. . . . . . =',I10/,                &
+       5X,'BULK MODULUS SCALE FACTOR (K0). . . . . . . =',1PG20.13/)
+ 1320 format(/                                                                 &
+       5X,'CONSTANT BULK MODULUS (K0). . . . . . . . . =',1PG20.13/)
+ 1330 format(/                                                                 &
+       5X,'SHEAR MODULUS G SCALE FUNCTION ID . . . . . =',I10/,                &
+       5X,'SHEAR MODULUS SCALE FACTOR (G0) . . . . . . =',1PG20.13/)
+ 1340 format(/                                                                 &
+       5X,'CONSTANT SHEAR MODULUS (G0) . . . . . . . . =',1PG20.13/)
+ 1400 format(/                                                                 &
        5X,'YIELD CRITERION & PLAST.POTENTIAL PARAMETERS:',/,                   &
-       5X,'---------------------------------------------',/,                   &
-       5X,'INITIAL MATERIAL COHESION (C0). . . . . . . =',1PG20.13/,           &
-       5X,'INITIAL CAP LIMIT PRESSURE (PB0). . . . . . =',1PG20.13/            &
+       5X,'---------------------------------------------',/)
+ 1410 format(/                                                                 &
        5X,'MATERIAL COHESION C SCALE FUNCTION ID . . . =',I10/,                &
+       5X,'MATERIAL COHESION SCALE FACTOR (C0) . . . . =',1PG20.13/)
+ 1420 format(/                                                                 &
+       5X,'CONSTANT MATERIAL COHESION (C0) . . . . . . =',1PG20.13/)
+ 1430 format(/                                                                 &
        5X,'CAP LIMIT PRESSURE PB SCALE FUNCTION ID . . =',I10/,                &
+       5X,'CAP LIMIT PRESSURE PB SCALE FACTOR (PB0). . =',1PG20.13/)
+ 1440 format(/                                                                 &   
+       5X,'CONSTANT CAP LIMIT PRESSURE (PB0) . . . . . =',1PG20.13/)  
+ 1450 format(/                                                                 &
        5X,'YIELD CRITERION FRICTION ANGLE (PHI). . . . =',1PG20.13/,           &
-       5X,'PLASTIC POTENTIAL FLOW ANGLE (PSI). . . . . =',1PG20.13/)  
- 1500 FORMAT(/                                                                 &
-       5X,'OTHER PARAMETERS:                            ',/,                   &
-       5X,'---------------------------------------------',/,                   &
+       5X,'PLASTIC POTENTIAL FLOW ANGLE (PSI). . . . . =',1PG20.13/,           &
        5X,'ALPHA RATIO (PA/PB) . . . . . . . . . . . . =',1PG20.13/,           &
        5X,'MAXIMUM DILATANCY (EPS_MAX) . . . . . . . . =',1PG20.13/,           &
-       5X,'INITIAL PLASTIC VOLUMETRIC STRAIN (EPSPV0). =',1PG20.13/,           &
        5X,'CAP SOFTENING FLAG (ISOFT). . . . . . . . . =',I10/                 &
        5X,'  ISOFT = 0: CAP HARDENING SOFTENING ALLOWED ',/,                   &
        5X,'  ISOFT = 1: NO CAP HARDENING SOFTENING      ',/)
- 1600 FORMAT(/                                                                 &
+ 1500 format(/                                                                 &
        5X,'POROSITY PARAMETERS:                         ',/,                   &
        5X,'---------------------------------------------',/,                   &
+       5X,'INITIAL PLASTIC VOLUMETRIC STRAIN (EPSPV0). =',1PG20.13/,           &
        5X,'BULK MODULUS OF WATER . . . . . . . . . . . =',1PG20.13/            &
        5X,'INITIAL POROSITY POR0 . . . . . . . . . . . =',1PG20.13/            &
        5X,'INITIAL WATER SATURATION SAT0 . . . . . . . =',1PG20.13/            &
-       5X,'INITIAL PORE PRESSURE U0  . . . . . . . . . =',1PG20.13/)
- 1700 FORMAT(/                                                                 &
-     & 5X,'TOLERANCE FOR THE CRITERION SHIFT . . . . . =',1PG20.13/            &
-     & 5X,'VISCOSITY FACTOR  . . . . . . . . . . . . . =',1PG20.13/)
+       5X,'INITIAL PORE PRESSURE U0  . . . . . . . . . =',1PG20.13/            &
+       5X,'TOLERANCE FOR THE CRITERION SHIFT . . . . . =',1PG20.13/            &
+       5X,'VISCOSITY FACTOR  . . . . . . . . . . . . . =',1PG20.13/)
 !-------------------------------------------------------------------------------
       end subroutine hm_read_mat81
       end module hm_read_mat81_mod
