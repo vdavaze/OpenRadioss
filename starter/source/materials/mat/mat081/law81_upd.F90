@@ -25,7 +25,7 @@
 ! \brief Update material law 81 to take into account tabulated stiffness
        subroutine law81_upd(                                                   &
          matparam,nfunc   ,ifunc   ,npc     ,snpc    ,pld     ,stf     ,       &
-         pm      ,npropm  )
+         pm      ,npropm  ,iout    ,mat_id  ,titr    )
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Modules
 ! ----------------------------------------------------------------------------------------------------------------------
@@ -48,6 +48,9 @@
          integer, intent(in)                       :: stf
          my_real, dimension(npropm), intent(inout) :: pm
          integer, intent(in)                       :: npropm
+         integer, intent(in)                       :: iout
+         integer, intent(in)                       :: mat_id
+         character(len=nchartitle), intent(in)     :: titr
          my_real :: finter
          external finter
 ! ----------------------------------------------------------------------------------------------------------------------
@@ -94,6 +97,25 @@
            pm(21) = matparam%nu
            pm(24) = matparam%young/(one - (matparam%nu)**2)
          endif
+!
+         !< Print the updated material parameters
+         write(iout,1000) titr,mat_id,81
+         write(iout,1100)
+         write(iout,1200) matparam%bulk,matparam%shear,matparam%young,matparam%nu
+!
+ 1000 format(/                                                                 &
+       5X,A,/,                                                                 &
+       5X,'MATERIAL NUMBER. . . . . . . . . . . . . . .=',I10/,                &
+       5X,'MATERIAL LAW . . . . . . . . . . . . . . . .=',I10/)
+ 1100 format(/                                                                 &
+       5X,'-----------------------------------------------------',/,           &
+       5X,'  ADDITIONAL DATA DRUCKER-PRAGER WITH CAP HARDENING  ',/,           &
+       5X,'-----------------------------------------------------',/)
+ 1200 FORMAT(/                                                                 &
+       5X,'INITIAL BULK MODULUS. . . . . . . . . . . . =',1PG20.13/            &
+       5X,'INITIAL SHEAR MODULUS . . . . . . . . . . . =',1PG20.13/            &
+       5X,'INITIAL YOUNG MODULUS (COMPUTED). . . . . . =',1PG20.13/            &
+       5X,'INITIAL POISSON RATIO (COMPUTED). . . . . . =',1PG20.13/)
 !
        end subroutine law81_upd
      end module law81_upd_mod
