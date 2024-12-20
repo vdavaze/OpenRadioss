@@ -109,7 +109,8 @@
             fac,ddepspv,ddepspd,dpxx,dpyy,dpzz,dpxy,dpyz,dpzx
           my_real, dimension(nel) :: k,g,lame,g2,c,pa,pb,p0,dcdepsp,dpbdepsp,  &
             deri,epspd,epspv,depspd,depspv,dcdepspd,dpbdepspv,dpadepspv,f,     &
-            p,sxx,syy,szz,sxy,syz,szx,pu,rc,a,muw,u,dudmu,por,epspv0,epspd0  
+            p,sxx,syy,szz,sxy,syz,szx,pu,rc,a,muw,u,dudmuw,por,epspv0,epspd0,  &
+            young  
 !=============================================================================== 
 !
           !=====================================================================
@@ -134,13 +135,19 @@
           tolmu     = matparam%uparam(14) !< Tolerance for capshift viscosity
           viscfac   = matparam%uparam(15) !< Viscosity factor
 !
+          !< Initialization of the volumetric plastic strain if needed
+          if ((uvar(1,2) == zero).and.(matparam%uparam(9) /= zero)) THEN  
+            defp(1:nel,2) = matparam%uparam(9)
+          endif
+!
           !=====================================================================
           !< - RECOVERING USER VARIABLES AND STATE VARIABLES
           !=====================================================================
           epspd0(1:nel) = defp(1:nel,1) !< Initial deviatoric plastic strain  
           epspv0(1:nel) = defp(1:nel,2) !< Initial volumetric plastic ptrain 
           epspd(1:nel)  = epspd0(1:nel) 
-          epspv(1:nel)  = epspv0(1:nel)
+          epspv(1:nel)  = epspv0(1:nel)    
+          et(1:nel)     = one           !< Coefficient for hourglass 
 !
           !=====================================================================
           !< - RECOVERING ELASTIC PARAMETERS
@@ -171,6 +178,10 @@
           else
             g(1:nel) = gini
           endif
+          !< Young modulus
+          do i = 1,nel
+            young(i) = nine*k(i)*g(i)/(three*k(i)+g(i))
+          enddo
           !< Two*shear modulus
           g2(1:nel) = two*g(1:nel)
           !< Lame coefficient
@@ -209,24 +220,26 @@
           !=====================================================================
           if (sat0 > zero) then
             do i = 1,nel
+              !< Compute porosity according to volumetric plastic strain
               por(i) = one - (one - por0)*exp(epspv(i) - epspvol0)
-              fac    = max(em03,por(i)/por0)
-              muw(i) = sat0/fac*amu(i)
+              !< Compute water volume fraction
+              muw(i) = (sat0/max(por(i)/por0,em20))*amu(i)
+              !< Compute pore water pressure and its derivative
               if (muw(i) >= tolmu) then
                 u(i) = kwater*muw(i)
-                dudmu(i) = kwater
+                dudmuw(i) = kwater
               elseif (muw(i) > -tolmu) then
                 u(i) = (kwater/(four*tolmu))*(muw(i)+tolmu)**2
-                dudmu(i) = (kwater/(two*tolmu))*(muw(i)+tolmu)
+                dudmuw(i) = (kwater/(two*tolmu))*(muw(i)+tolmu)
               else
                 u(i) = zero
-                dudmu(i) = zero
+                dudmuw(i) = zero
               endif
             enddo
           else
-            muw(1:nel)   = -one
-            u(1:nel)     = zero
-            dudmu(1:nel) = zero
+            muw(1:nel)    = -one
+            u(1:nel)      = zero
+            dudmuw(1:nel) = zero
           endif 
 !
           !=====================================================================
@@ -296,7 +309,6 @@
           indxtricomp(1:nel) = 0
           nindx = 0
           indx(1:nel) = 0
-! 
           !< Preliminary computation to know the location: 
           ! - on the yield surface
           ! - on the cap hardening surface
@@ -320,7 +332,6 @@
               rc(i) = one - ((p(i)-pa(i))/(pb(i)-pa(i)))**2
               rc(i) = sqrt(max(rc(i),zero))
             endif 
-!
             !< Check the yield condition
             a(i) = max(zero,p(i)*tgphi + c(i))
             f(i) = seq(i) - rc(i)*a(i)
@@ -357,6 +368,11 @@
                 pb(1:nel) = capini*pb(1:nel)
                 dpbdepspv(1:nel) = capini*dpbdepspv(1:nel)
                 vartmp(1:nel,4) = ipos(1:nel)
+              enddo
+              !< Update coefficient for hourglass
+              do ii = 1, ntricomp
+                i = indxtricomp(ii)
+                et(i) = max(et(i),dpbdepspv(i)/(dpbdepspv(i) + k(i)))
               enddo
             !< Constant cap pressure
             else
@@ -638,7 +654,19 @@
                 !< New yield function value
                 f(i) = seq(i) - rc(i)*a(i)
               enddo
-            enddo      
+            enddo 
+!
+            !< Update coefficient for hourglass
+            do ii = 1, nindx
+              i = indx(ii)
+              if (depspv(i) > zero) then
+                et(i) = max(et(i),dpbdepspv(i)/(dpbdepspv(i) + k(i)))
+              endif
+              if (depspd(i) > zero) then
+                et(i) = max(et(i),dcdepspd(i)/(dcdepspd(i) + young(i)))
+              endif
+            enddo
+!
           endif
           !=====================================================================
           ! - END OF PLASTIC CORRECTION WITH CUTTING PLANE METHOD
@@ -685,9 +713,7 @@
             defp(1:nel,1) = epspd(1:nel) !< Deviatoric Equivalent Plastic Strain  
             defp(1:nel,2) = epspv(1:nel) !< Volumetric Plastic Strain  
             !< Sound speed in the material
-            soundsp(i) = sqrt((k(i) + four_over_3*g(i) + dudmu(i))/rho0(i))
-            !< Coefficient for hourglass 
-            et(i) = one
+            soundsp(i) = sqrt((k(i) + four_over_3*g(i) + dudmuw(i))/rho0(i))
           enddo 
 !
         end subroutine sigeps81

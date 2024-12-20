@@ -24,7 +24,8 @@
        contains
 ! \brief Update material law 81 to take into account tabulated stiffness
        subroutine law81_upd(                                                   &
-         matparam,nfunc   ,ifunc   ,npc     ,pld     ,pm      ,npropm  )
+         matparam,nfunc   ,ifunc   ,npc     ,snpc    ,pld     ,stf     ,       &
+         pm      ,npropm  )
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   Modules
 ! ----------------------------------------------------------------------------------------------------------------------
@@ -41,8 +42,10 @@
          type(matparam_struct_), intent(inout)     :: matparam
          integer, intent(in)                       :: nfunc
          integer, dimension(nfunc), intent(in)     :: ifunc
-         integer, dimension(*), intent(in)         :: npc
-         my_real, dimension(*), intent(in)         :: pld
+         integer, dimension(snpc), intent(in)      :: npc
+         integer, intent(in)                       :: snpc
+         my_real, dimension(stf), intent(in)       :: pld
+         integer, intent(in)                       :: stf
          my_real, dimension(npropm), intent(inout) :: pm
          integer, intent(in)                       :: npropm
          my_real :: finter
@@ -85,8 +88,8 @@
          if ((ifunc(1) > 0).or.(ifunc(2) > 0)) then
            kini = matparam%bulk
            gini = matparam%shear
-           matparam%young = nine*kini*gini/(three*kini+gini)
-           matparam%nu = (three*kini-two*gini)/(six*kini+two*gini)
+           matparam%young = nine*kini*gini/(three*kini + gini)
+           matparam%nu = (three*kini - two*gini)/(six*kini + two*gini)
            pm(20) = matparam%young
            pm(21) = matparam%nu
            pm(24) = matparam%young/(one - (matparam%nu)**2)

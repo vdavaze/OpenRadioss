@@ -281,8 +281,8 @@ c------------------
 c
 c------------------
           CASE (81) 
-            CALL LAW81_UPD(MATPARAM,NFUNC    ,IFUNC  ,NPC      ,PLD      ,
-     .                     PM(1,IMAT),NPROPM )
+            CALL LAW81_UPD(MATPARAM,NFUNC    ,IFUNC  ,NPC      ,SNPC     ,
+     .                     PLD     ,STF      ,PM(1,IMAT),NPROPM)
 c          
 c------------------
           CASE (87) !BARLAT 2D
