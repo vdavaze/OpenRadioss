@@ -52,7 +52,7 @@
       subroutine hm_read_mat163(                                               &
                    matparam ,nvartmp  ,parmat   ,unitab   ,mat_id   ,titr     ,&
                    mtag     ,lsubmodel,iout     ,nuvar    ,ilaw     ,ntable   ,&
-                   table    )
+                   table    ,imatvis  )
 !-----------------------------------------------
 !   M o d u l e s
 !-----------------------------------------------
@@ -86,6 +86,7 @@
         integer, intent(in)                   :: ilaw              !< material law number
         integer, intent(in)                   :: ntable            !< number of tables
         type(ttable),dimension(ntable),intent(in) :: table         !< tables data structure
+        integer, intent(inout)                :: imatvis           !< viscosity flag
 !-----------------------------------------------
 !   L o c a l   V a r i a b l e s
 !-----------------------------------------------
@@ -141,6 +142,8 @@
         if (ncycle == zero) ncycle = 12
         !< Default strain rate change limit
         if (srclmt == zero) srclmt = infinity
+        !< Viscosity flag
+        imatvis = 1
 !
 !-------------------------------------------------------------------------------
         !< Filling buffer tables

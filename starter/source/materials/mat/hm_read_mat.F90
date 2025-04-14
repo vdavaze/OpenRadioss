@@ -204,6 +204,7 @@
       use hm_read_mat57_mod
       use hm_read_mat81_mod
       use hm_read_mat87_mod
+      use hm_read_mat88_mod
       use hm_read_mat125_mod
       use hm_read_mat126_mod
       use hm_read_mat127_mod
@@ -932,10 +933,10 @@
           case ('LAW88','MLAW88')
             ilaw = 88
             call hm_read_mat88(&
-            &uparam   ,maxuparam ,nuparam  ,israte  ,imatvis  ,&
-            &nuvar    ,ifunc     ,maxfunc  ,nfunc   ,parmat   ,&
-            &unitab   ,mat_id    ,titr     ,mtag    ,lsubmodel,&
-            &pm(1,i)  ,ipm(1,i)  ,matparam )
+            &matparam ,nvartmp  ,parmat   ,unitab   ,mat_id   ,&
+            &titr     ,mtag     ,lsubmodel,iout     ,nuvar    ,&
+            &ilaw     ,ntable   ,table    ,imatvis  ,israte   ,&
+            &maxfunc  )
 !-------
           case ('LAW90')
             ilaw = 90
@@ -1201,7 +1202,7 @@
             call hm_read_mat163(&
             &matparam ,nvartmp  ,parmat   ,unitab   ,mat_id   ,&
             &titr     ,mtag     ,lsubmodel,iout     ,nuvar    ,&
-            &ilaw     ,ntable   ,table    )
+            &ilaw     ,ntable   ,table    ,imatvis  )
 !-------
           case ('LAW169','ARUP_ADHESIVE')
             ilaw  = 169
