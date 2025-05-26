@@ -39,13 +39,13 @@
       !||    constant_mod       ../common_source/modules/constant_mod.F
       !||    matparam_def_mod   ../common_source/modules/mat_elem/matparam_def_mod.F90
       !||====================================================================
-         SUBROUTINE sigeps125c(                                   &
-           nel     ,mat_param  , nuvar    ,uvar,                  &
-           rho     ,thk       ,thkly     , shf ,                  &
-           epsxx   ,epsyy      ,epsxy   ,epsyz   ,epszx ,         &    
-           sigoxx  ,sigoyy     ,                                  &
-           signxx  ,signyy     ,signxy  ,signzx   ,signyz  ,      &
-           off     ,sigy       ,etse    ,ssp   ) 
+        subroutine sigeps125c(                                                 &
+          nel      ,mat_param,nuvar    ,uvar     ,                             &
+          rho      ,thk      ,thkly    ,shf      ,                             &
+          epsxx    ,epsyy    ,epsxy    ,epsyz    ,epszx    ,                   &    
+          sigoxx   ,sigoyy   ,                                                 &
+          signxx   ,signyy   ,signxy   ,signzx   ,signyz   ,                   &
+          off      ,sigy     ,etse     ,ssp   ) 
 !-----------------------------------------------
 !   M o d u l e s
 !-----------------------------------------------
@@ -60,54 +60,51 @@
 !-----------------------------------------------
 !   D u m m y   A r g u m e n t s
 !-----------------------------------------------
-          integer, intent(in) :: nel !< number of elements in the group
-          integer, intent(in) :: nuvar !< number of user variables
-
+          integer, intent(in)                    :: nel        !< number of elements in the group
+          type(matparam_struct_), intent(in)     :: mat_param  !< material parameters data
+          integer, intent(in)                    :: nuvar      !< number of user variables
           my_real, dimension(nel,nuvar), intent(inout) :: uvar !< user variables
-          type(matparam_struct_), intent(in) :: mat_param !< material parameters data
-          my_real, dimension(nel), intent(in) :: rho !< material density
-          my_real, dimension(nel), intent(inout) :: sigy !< yield stress
-          my_real, dimension(nel), intent(inout) :: shf !< shear factor correction 
-          my_real, dimension(nel), intent(inout) :: thk !< shell thickness 
-          my_real, dimension(nel), intent(in)    :: thkly !< ply thickness  
-          my_real, dimension(nel), intent(inout) :: etse !< ratio of rigidity  
-          my_real, dimension(nel), intent(in) :: sigoxx !< old stress xx 
-          my_real, dimension(nel), intent(in) :: sigoyy !< old stress yy
-          my_real, dimension(nel), intent(in) :: epsxx !< total strain xx 
-          my_real, dimension(nel), intent(in) :: epsyy !< total strain yy
-          my_real, dimension(nel), intent(in) :: epsxy !< total strain xy 
-          my_real, dimension(nel), intent(in) :: epsyz !< total strain yz 
-          my_real, dimension(nel), intent(in) :: epszx !< total strain zx 
-          my_real, dimension(nel), intent(out) :: signxx !< new stress xx 
-          my_real, dimension(nel), intent(out) :: signyy !< new stress yy
-          my_real, dimension(nel), intent(out) :: signxy !< new stress xy 
-          my_real, dimension(nel), intent(out) :: signyz !< new stress yz 
-          my_real, dimension(nel), intent(out) :: signzx !< new stress zx 
-          my_real, dimension(nel), intent(inout) :: ssp !< sound speed
-          my_real, dimension(nel), intent(inout) :: off !< element deletion flag
+          my_real, dimension(nel), intent(in)    :: rho        !< material density
+          my_real, dimension(nel), intent(inout) :: thk        !< shell thickness 
+          my_real, dimension(nel), intent(in)    :: thkly      !< ply thickness  
+          my_real, dimension(nel), intent(inout) :: shf        !< shear factor correction 
+          my_real, dimension(nel), intent(in)    :: epsxx      !< total strain xx 
+          my_real, dimension(nel), intent(in)    :: epsyy      !< total strain yy
+          my_real, dimension(nel), intent(in)    :: epsxy      !< total strain xy 
+          my_real, dimension(nel), intent(in)    :: epsyz      !< total strain yz 
+          my_real, dimension(nel), intent(in)    :: epszx      !< total strain zx 
+          my_real, dimension(nel), intent(inout) :: sigy       !< yield stress
+          my_real, dimension(nel), intent(inout) :: etse       !< ratio of rigidity  
+          my_real, dimension(nel), intent(in)    :: sigoxx     !< old stress xx 
+          my_real, dimension(nel), intent(in)    :: sigoyy     !< old stress yy
+          my_real, dimension(nel), intent(out)   :: signxx     !< new stress xx 
+          my_real, dimension(nel), intent(out)   :: signyy     !< new stress yy
+          my_real, dimension(nel), intent(out)   :: signxy     !< new stress xy 
+          my_real, dimension(nel), intent(out)   :: signyz     !< new stress yz 
+          my_real, dimension(nel), intent(out)   :: signzx     !< new stress zx 
+          my_real, dimension(nel), intent(inout) :: ssp        !< sound speed
+          my_real, dimension(nel), intent(inout) :: off        !< element deletion flag
 !-----------------------------------------------
 !   L o c a l   V a r i a b l e s
 !-----------------------------------------------
-      integer fs, i,damage,updat,updat1,updat2,nkey
-      my_real                                                       &
-       e1,e2,nu12,nu21,em11t,xt,slimt1,em11c,xc,slimc1,             &
-       em22t,yt,slimt2,em22c,yc,slimc2,gamma,tau,ems,sc,            &
-       slims,gammaf,gammar, tsdm, erods,tsize,ef11t,ef11c,          &
-       m1t,m1c,al1t,al2t,al2c,als,mfs,ms,e1d,e2d,g12d,d,            &
-       w11,w22,w12,al1c,ef22c,ef22t,e12d,efs,invd,m2c,m2t,          &
-       e21d,g12,limit_sig, eint, deint,a11,tauxy,g13,g23,tag
-      my_real , dimension(nel) ::  dezz,check,xc_r
-
-      !
-      logical :: abit_t,abit_c,abit_s
+          integer fs, i,damage,updat,updat1,updat2,nkey
+          my_real                                                              &
+            e1,e2,nu12,nu21,em11t,xt,slimt1,em11c,xc,slimc1,                   &
+            em22t,yt,slimt2,em22c,yc,slimc2,gamma,tau,ems,sc,                  &
+            slims,gammaf,gammar, tsdm, erods,tsize,ef11t,ef11c,                &
+            m1t,m1c,al1t,al2t,al2c,als,mfs,ms,e1d,e2d,g12d,d,                  &
+            w11,w22,w12,al1c,ef22c,ef22t,e12d,efs,invd,m2c,m2t,                &
+            e21d,g12,limit_sig, eint, deint,a11,tauxy,g13,g23,tag
+          my_real , dimension(nel) ::  dezz,check,xc_r
+          logical :: abit_t,abit_c,abit_s
 !!======================================================================
 !
        FS = 0 ! type of failure yield surface method
-                              !  =  -1   
-                              !  =  0  
-                              !  =  1  
+              !  =  -1   
+              !  =  0  
+              !  =  1  
 !--------------------------  
-          ! Material parameters
+       ! Material parameters
        e1    = mat_param%uparam(1)  
        e2    = mat_param%uparam(2)  
        g12   = mat_param%uparam(4)  
@@ -115,7 +112,7 @@
        g23   = mat_param%uparam(6)  
        nu12  = mat_param%uparam(8) 
        nu21  = mat_param%uparam(78) 
-      ! Fiber direction
+       ! Fiber direction
        em11t  = mat_param%uparam(11) 
        xt     = mat_param%uparam(12) 
        slimt1 = mat_param%uparam(13) 
