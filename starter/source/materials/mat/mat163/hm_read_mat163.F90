@@ -76,7 +76,7 @@
           type(matparam_struct_) ,intent(inout) :: matparam          !< matparam data structure
 
           integer, intent(inout)                :: nvartmp           !< number of temporary variables
-          real(kind=WP), intent(inout)                :: parmat(100)       !< material parameter global table 1
+          real(kind=WP), intent(inout)          :: parmat(100)       !< material parameter global table 1
           type(unit_type_),intent(in)           :: unitab            !< units table
           integer, intent(in)                   :: mat_id            !< material law user ID
           character(len=nchartitle),intent(in)  :: titr              !< material law user title
@@ -90,10 +90,10 @@
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                   local variables
 ! ----------------------------------------------------------------------------------------------------------------------
-          integer :: tab_id,ncycle,nrs,ierr
+          integer :: tab_id,ncycle,nrs,ierr,npt,ndim,nl,i,j
           real(kind=WP) :: rho0,shear,young,nu,bulk,tsc,damp,srclmt,lam,cii,cij,       &
             x1scale,x2scale,x3scale,x4scale,x2vect(1),x3vect(1),x4vect(1),       &
-            fscale(1)
+            fscale(1),dx,dy
           logical :: is_encrypted,is_available
 ! ----------------------------------------------------------------------------------------------------------------------
 !                                                      body
@@ -129,13 +129,6 @@
           if (fscale(1) == zero) then
             call hm_get_floatv_dim('FSCALE',fscale(1),is_available,lsubmodel,unitab)
           endif
-          !< Shear modulus
-          shear = young/(two*(one+nu))
-          bulk  = young/(three*(one - two*nu))
-          !< Stifness matrix components
-          lam = young*nu / (one+nu) / (one - two*nu)
-          cii = lam + shear*two
-          cij = lam
           !< Damping default value
           if (damp == zero) damp = em01
           !< Default number of cycles
@@ -165,17 +158,6 @@
           matparam%iparam(1)  = ncycle
           matparam%iparam(2)  = nrs
 !
-          !< Real material parameters
-          matparam%young      = young
-          matparam%nu         = nu
-          matparam%shear      = shear
-          matparam%bulk       = bulk
-          matparam%uparam(1)  = cii
-          matparam%uparam(2)  = cij
-          matparam%uparam(3)  = tsc
-          matparam%uparam(4)  = damp
-          matparam%uparam(5)  = srclmt
-!
           !< Transform global table into material table
           matparam%table(1)%notable = tab_id
           x1scale   = one
@@ -187,6 +169,49 @@
           call mat_table_copy(matparam ,x2vect   ,x3vect   ,x4vect   ,         &
             x1scale  ,x2scale  ,x3scale  ,x4scale  ,fscale   ,         &
             ntable   ,table    ,ierr     )
+          !< Compute maximal slope for the bulk modulus
+          npt = size(matparam%table(1)%x(1)%values)
+          ndim = matparam%table(1)%ndim
+          bulk = young/(three*(one - two*nu))
+          if (ndim == 1) then 
+            do i = 2,npt
+              dx = matparam%table(1)%x(1)%values(i) - matparam%table(1)%x(1)%values(i-1)
+              dy = matparam%table(1)%y1d(i) - matparam%table(1)%y1d(i-1)
+              if (dx > zero) then
+                bulk = max(bulk,dy/dx)
+              endif
+            enddo
+          elseif (ndim == 2) then
+            nl = size(matparam%table(1)%x(2)%values)
+            do j = 1, nl
+              do i = 2,npt
+                dx = matparam%table(1)%x(1)%values(i) - matparam%table(1)%x(1)%values(i-1)
+                dy = matparam%table(1)%y2d(i,j) - matparam%table(1)%y2d(i-1,j)
+                if (dx > zero) then
+                  bulk = max(bulk,dy/dx)
+                endif
+              enddo
+            enddo
+          endif
+          !< Update the Young modulus if necessary
+          young = bulk*(three*(one - two*nu))
+          !< Shear modulus
+          shear = young/(two*(one+nu))
+          !< Stifness matrix components
+          lam = young*nu / (one+nu) / (one - two*nu)
+          cii = lam + shear*two
+          cij = lam
+!
+          !< Real material parameters
+          matparam%young      = young
+          matparam%nu         = nu
+          matparam%shear      = shear
+          matparam%bulk       = bulk
+          matparam%uparam(1)  = cii
+          matparam%uparam(2)  = cij
+          matparam%uparam(3)  = tsc
+          matparam%uparam(4)  = damp
+          matparam%uparam(5)  = srclmt
 !
           !< PARMAT table
           parmat(1)  = bulk
@@ -225,7 +250,7 @@
             write(iout,'(5X,A,//)') 'CONFIDENTIAL DATA'
           else
             write(iout,1002) rho0
-            write(iout,1003) young,nu
+            write(iout,1003) young,nu,shear,bulk
             write(iout,1004) tsc,damp,ncycle,tab_id,x2vect(1),fscale(1),srclmt,nrs
           endif
 !
@@ -233,18 +258,20 @@
             5X,'-------------------------------------------------------',/          &
             5X,'           MATERIAL MODEL: CRUSHABLE FOAM              ',/,         &
             5X,'-------------------------------------------------------',/)
-1001      format(/                                                                 &
+1001      format(/                                                                  &
             5X,A,/,                                                                 &
             5X,'MATERIAL NUMBER. . . . . . . . . . . . . . . . . . . .=',I10/,      &
             5X,'MATERIAL LAW . . . . . . . . . . . . . . . . . . . . .=',I10/)
-1002      format(/                                                                 &
+1002      format(/                                                                  &
             5X,'INITIAL DENSITY. . . . . . . . . . . . . . . . . . . .=',1PG20.13/)
-1003      format(/                                                                 &
+1003      format(/                                                                  &
             5X,'ELASTIC PARAMETERS:                                    ',/,         &
             5X,'-------------------                                    ',/,         &
             5X,'YOUNG MODULUS (E). . . . . . . . . . . . . . . . . . .=',1PG20.13/  &
-            5X,'POISSON RATIO (NU) . . . . . . . . . . . . . . . . . .=',1PG20.13/)
-1004      format(/                                                                 &
+            5X,'POISSON RATIO (NU) . . . . . . . . . . . . . . . . . .=',1PG20.13/  & 
+            5X,'SHEAR MODULUS (G). . . . . . . . . . . . . . . . . . .=',1PG20.13/  &
+            5X,'BULK MODULUS (K) . . . . . . . . . . . . . . . . . . .=',1PG20.13/)
+1004      format(/                                                                  &
             5X,'PLASTIC PARAMETERS:                                    ',/,         &
             5X,'-------------------                                    ',/,         &
             5X,'TENSILE STRESS CUTOFF (TSC). . . . . . . . . . . . . .=',1PG20.13/  &
