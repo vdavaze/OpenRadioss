@@ -193,10 +193,10 @@
               enddo
             enddo
           endif
-          !< Update the Young modulus if necessary
-          young = bulk*(three*(one - two*nu))
-          !< Shear modulus
-          shear = young/(two*(one+nu))
+          !< Update the Young modulus
+          young = max(bulk*(three*(one - two*nu)),young)
+          !< Update the Shear modulus
+          shear = max(young/(two*(one+nu)),shear)
           !< Stifness matrix components
           lam = young*nu / (one+nu) / (one - two*nu)
           cii = lam + shear*two
