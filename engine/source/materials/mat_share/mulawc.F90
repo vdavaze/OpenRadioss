@@ -219,6 +219,7 @@
           use sigeps125c_mod
           use sigeps127c_mod
           use sigeps128c_mod
+          use sigeps131c_mod
           use elbufdef_mod
           use dt_mod
           use file_descriptor_mod
@@ -1894,6 +1895,17 @@
                   ssp      ,thkn     ,lbuf%pla ,dpla     ,lbuf%epsd,       &
                   off      ,etse     ,thklyl   ,shf      ,sigy     ,       &
                   hardm    ,lbuf%seq ,l_sigb   ,lbuf%sigb)
+!
+              elseif (ilaw == 131) then
+                call sigeps131c(                                           &
+                  nel      ,matparam ,rho      ,nvartmp  ,vartmp   ,       &
+                  depsxx   ,depsyy   ,depsxy   ,depsyz   ,depszx   ,       &
+                  sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,       &
+                  signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,       &
+                  ssp      ,off      ,lbuf%pla ,dpla     ,lbuf%seq ,       &
+                  etse     ,sigy     ,dt1      ,epsd     ,el_temp  ,       &
+                  shf      ,thkn     ,thklyl   ,asrate   ,l_sigb   ,       &
+                  lbuf%sigb,epsd_pg  ,nuvar    ,uvar     )
 !
               elseif (ilaw == 158) then
                 call sigeps158c(&

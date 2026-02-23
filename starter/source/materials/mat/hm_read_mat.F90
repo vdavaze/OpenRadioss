@@ -237,6 +237,7 @@
           use hm_read_mat128_mod
           use hm_read_mat129_mod
           use hm_read_mat130_mod
+          use hm_read_elasto_plastic_mod
           use hm_read_mat133_mod , only : hm_read_mat133
           use hm_read_mat134_mod
           use hm_read_mat163_mod
@@ -1236,6 +1237,13 @@
                 parmat   ,unitab   ,lsubmodel,israte   ,mat_id   ,&
                 titr     ,table    ,ntable   ,nvartmp  ,imatvis  ,&
                 iunit    )
+!-------
+             case ('LAW131','ELASTO_PLASTIC')
+              ilaw  = 131
+              call hm_read_elasto_plastic(&
+              &matparam ,nvartmp  ,parmat   ,unitab   ,mat_id   ,&
+              &titr     ,mtag     ,lsubmodel,iout     ,nuvar    ,&
+              &ilaw     ,israte   ,ntable   ,table    )
 !-------
              case ('LAW133','GRANULAR')
               ilaw = 133

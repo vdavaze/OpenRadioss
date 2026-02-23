@@ -1,0 +1,79 @@
+!Copyright>        OpenRadioss
+!Copyright>        Copyright (C) 1986-2026 Altair Engineering Inc.
+!Copyright>
+!Copyright>        This program is free software: you can redistribute it and/or modify
+!Copyright>        it under the terms of the GNU Affero General Public License as published by
+!Copyright>        the Free Software Foundation, either version 3 of the License, or
+!Copyright>        (at your option) any later version.
+!Copyright>
+!Copyright>        This program is distributed in the hope that it will be useful,
+!Copyright>        but WITHOUT ANY WARRANTY; without even the implied warranty of
+!Copyright>        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!Copyright>        GNU Affero General Public License for more details.
+!Copyright>
+!Copyright>        You should have received a copy of the GNU Affero General Public License
+!Copyright>        along with this program.  If not, see <https://www.gnu.org/licenses/>.
+!Copyright>
+!Copyright>
+!Copyright>        Commercial Alternative: Altair Radioss Software
+!Copyright>
+!Copyright>        As an alternative to this open-source version, Altair also offers Altair Radioss
+!Copyright>        software under a commercial license.  Contact Altair to discuss further if the
+!Copyright>        commercial version may interest you: https://www.altair.com/radioss/.
+      module srate_dependency_johnsoncook_mod
+      contains
+      subroutine srate_dependency_johnsoncook(                                    &
+        matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,timestep )
+!----------------------------------------------------------------
+!   M o d u l e s
+!----------------------------------------------------------------
+        use matparam_def_mod
+        use constant_mod
+        use precision_mod, only : WP
+!----------------------------------------------------------------
+!   I m p l i c i t   T y p e s
+!----------------------------------------------------------------
+        implicit none
+!----------------------------------------------------------------
+!  I n p u t   A r g u m e n t s
+!----------------------------------------------------------------
+        type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
+        integer,                       intent(in)    :: nel        !< Number of elements in the group
+        real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
+        real(kind=WP), dimension(nel), intent(in)    :: epsd       !< Strain rate
+        real(kind=WP), dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
+        integer,                       intent(in)    :: vpflag     !< Viscoplastic flag
+        real(kind=WP),                 intent(in)    :: timestep   !< Time step
+!----------------------------------------------------------------
+!  L o c a l  V a r i a b l e s
+!----------------------------------------------------------------
+        integer :: offset,i
+        real(kind=WP) :: cjc,epsdref,ratefac,dratefac
+!===============================================================================
+!
+        !=======================================================================
+        !< - Select strain rate dependency model
+        !=======================================================================
+        offset = matparam%iparam(7)
+        !< Recover strain rate dependency parameters
+        cjc     = matparam%uparam(offset + 1) !< Johnson-Cook strain rate sensitivity coefficient
+        epsdref = matparam%uparam(offset + 2) !< Reference strain rate
+        !< Full viscoplastic formulation
+        if (vpflag == 4) then
+          do i = 1,nel
+            ratefac  = one + cjc*log(one + (epsd(i)/epsdref))
+            dratefac = (cjc/timestep)*(one/(epsdref + epsd(i)))
+            dsigy_dpla(i) = dsigy_dpla(i)*ratefac + sigy(i)*dratefac
+            sigy(i) = sigy(i)*ratefac
+          enddo
+        !< Scaled yield stress formulation
+        else
+          do i = 1,nel
+            ratefac  = one + cjc*log(one + (epsd(i)/epsdref))
+            sigy(i) = sigy(i)*ratefac
+            dsigy_dpla(i) = dsigy_dpla(i)*ratefac
+          enddo
+        endif
+!
+      end subroutine srate_dependency_johnsoncook
+      end module srate_dependency_johnsoncook_mod
