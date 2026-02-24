@@ -23,8 +23,8 @@
       module elasto_plastic_yield_stress_mod
       contains
       subroutine elasto_plastic_yield_stress(                                  &
-        matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,nvartmp  ,&
-        vartmp   ,temp     ,dtemp_dpla)
+        matparam ,nel       ,nindx    ,indx     ,sigy     ,pla      ,epsd     ,&
+        dsigy_dpla,nvartmp  ,vartmp   ,temp     ,dtemp_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -52,6 +52,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),          intent(in)    :: matparam   !< Material parameters data
         integer,                         intent(in)    :: nel        !< Number of elements in the group
+        integer,                         intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer, dimension(nel),         intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel),   intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel),   intent(inout) :: pla        !< Cumulated plastic strain
         real(kind=WP), dimension(nel),   intent(in)    :: epsd       !< Strain rate
@@ -88,8 +90,8 @@
           !---------------------------------------------------------------------
           case(3)
             call work_hardening_tabulated(                                     &
-              matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,    &
-              nvartmp  ,vartmp   )
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,pla      ,    &
+              epsd     ,dsigy_dpla,nvartmp  ,vartmp   )
           !---------------------------------------------------------------------
           !< Linear-Voce work hardening
           !---------------------------------------------------------------------

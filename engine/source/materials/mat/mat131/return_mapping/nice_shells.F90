@@ -112,6 +112,13 @@
         !=======================================================================
         !< Viscoplastic formulation flag
         vpflag = matparam%iparam(10)
+        !< Total strain-rate computation
+        if (vpflag > 1) then
+          epsd(1:nel) = asrate*epsd_pg(1:nel) + (one-asrate)*epsd(1:nel)
+        !< Plastic strain rate recovering
+        else
+          epsd(1:nel) = uvar(1:nel,1)
+        endif
         !< Kinematic hardening flag
         ikine = matparam%iparam(22)
         !< Mixed kinematic/isotropic hardening parameter
@@ -138,15 +145,12 @@
         sig0yz(1:nel) = sigoyz(1:nel)
         sig0zx(1:nel) = sigozx(1:nel)
         !< Recover previous value of the yield function
-        phi0(1:nel) = uvar(1:nel,1)
-!
-        !< Total strain-rate computation
-        if (vpflag > 1) then
-          epsd(1:nel) = asrate*epsd_pg(1:nel) + (one-asrate)*epsd(1:nel)
-        !< Plastic strain rate recovering
-        else
-          epsd(1:nel) = uvar(1:nel,1)
-        endif
+        phi0(1:nel) = uvar(1:nel,2)
+        !< Initial index array 
+        nindx = nel
+        do i = 1,nel
+          indx(i) = i
+        enddo
 !
         !=======================================================================
         !< - Computation of the elastic trial stress tensor
@@ -162,8 +166,8 @@
         !< - Computation of the initial yield stress
         !=======================================================================
         call elasto_plastic_yield_stress(                                      &
-          matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,        &
-          nvartmp  ,vartmp   ,temp     ,dtemp_dpla)
+          matparam ,nel      ,nindx    ,indx      ,sigy     ,pla      ,        &
+          epsd     ,dsigy_dpla,nvartmp  ,vartmp   ,temp     ,dtemp_dpla)
 !
         !=======================================================================
         !< - Backstress tensor computation for kinematic hardening models
@@ -193,8 +197,8 @@
           zeros(1:nel) = zero
           ipos0(1:nel,1:nvartmp) = 0
           call elasto_plastic_yield_stress(                                    &
-            matparam ,nel      ,sigy0    ,zeros    ,epsd     ,dsigy0_dpla,     &
-            nvartmp  ,ipos0    ,temp     ,dtemp0_dpla)
+            matparam ,nel      ,nindx    ,indx      ,sigy0    ,zeros    ,      &
+            epsd     ,dsigy0_dpla,nvartmp,ipos0     ,temp     ,dtemp0_dpla)
           !< Update of the yield stress for kinematic hardening models
           sigy(1:nel) = (one - chard)*sigy(1:nel) + chard*sigy0(1:nel)
         endif
@@ -203,10 +207,10 @@
         !< - Computation of the trial equivalent stress and its 1st derivative
         !=======================================================================
         call elasto_plastic_eq_stress(                                         &
-          matparam ,nel      ,seq      ,iresp    ,eltype   ,                   &
+          matparam ,nel      ,nindx    ,indx     ,iresp    ,eltype   ,         &
           signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
           normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,         &
-          N        ,.false.  )
+          N        ,.false.  ,seq      )
 !
         !=======================================================================
         !< - Computation of the trial yield function and count yielding elements
@@ -238,21 +242,17 @@
           !                   into account of internal variables kinetic : 
           !                plasticity, strain-rate ... (to be computed)
 !
+          !< Computation of equivalent stress of the previous stress tensor
+          call elasto_plastic_eq_stress(                                       &
+            matparam ,nel      ,nindx    ,indx     ,iresp    ,eltype   ,       &
+            sig0xx   ,sig0yy   ,sig0zz   ,sig0xy   ,sig0yz   ,sig0zx   ,       &
+            normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,       &
+            N        ,.false.  ,seq      )
+!
           !< Loop over yielding elements
+#include "vectorize.inc"
           do ii = 1,nindx
             i = indx(ii)
-!
-            !< Computation of the trial stress increment
-            dsigxx(i) = signxx(i) - sig0xx(i)
-            dsigyy(i) = signyy(i) - sig0yy(i)
-            dsigxy(i) = signxy(i) - sig0xy(i)  
-!
-            !< Computation of equivalent stress of the previous stress tensor
-            call elasto_plastic_eq_stress(                                     &
-              matparam ,1        ,seq(i)   ,iresp    ,eltype   ,               &
-              sig0xx(i),sig0yy(i),sig0zz(i),sig0xy(i),sig0yz(i),sig0zx(i),     &
-              normxx(i),normyy(i),normzz(i),normxy(i),normyz(i),normzx(i),     &
-              N(i,1,1) ,.false.  )
 !
             !< 1 - Derivative of equivalent stress sigeq w.r.t lambda
             !< -----------------------------------------------------------------
@@ -332,6 +332,10 @@
 !
             !<  a) Computation of the plastic multiplier increment dlam
             !<  ----------------------------------------------------------------
+            !< Computation of the trial stress increment
+            dsigxx(i) = signxx(i) - sig0xx(i)
+            dsigyy(i) = signyy(i) - sig0yy(i)
+            dsigxy(i) = signxy(i) - sig0xy(i) 
             !< Computation of yield surface trial increment dphi       
             dphi = dphi_dseq * (                                               &
                    normxx(i) * dsigxx(i)                                       &
@@ -356,17 +360,22 @@
             temp(i) = temp(i) + dtemp_dpla(i)*dpla_dlam*dlam
             !< Out-of-plane plastic strain for shell elements
             depzz(i) = depzz(i) + dlam*normzz(i)
+          enddo
 !
-            !<  d) Yield stress update
-            !<  ----------------------------------------------------------------
-            call elasto_plastic_yield_stress(                                  &
-              matparam ,1        ,sigy(i)  ,pla(i)   ,epsd(i) ,dsigy_dpla(i),  &
-              nvartmp  ,vartmp(i,1:nvartmp),temp(i) ,dtemp_dpla(i))
+          !<  d) Yield stress update
+          !<  ----------------------------------------------------------------
+          call elasto_plastic_yield_stress(                                    &
+            matparam ,nel      ,nindx    ,indx      ,sigy     ,pla      ,      &
+            epsd     ,dsigy_dpla,nvartmp ,vartmp    ,temp     ,dtemp_dpla)
 !
-            !<  e) Backstress tensor update
-            !<  ----------------------------------------------------------------
-            !< Update of the backstress tensor (if kinematic hardening)
-            if (ikine > 0) then
+          !<  e) Backstress tensor update
+          !<  ----------------------------------------------------------------
+          !< Update of the backstress tensor (if kinematic hardening)
+          if (ikine > 0) then
+            !< Loop over yielding elements
+#include "vectorize.inc"
+            do ii = 1,nindx
+              i = indx(ii)
               ! -> Remove kinematic hardening contribution
               signxx(i) = signxx(i) + (sigbxx(i) - sigbzz(i))
               signyy(i) = signyy(i) + (sigbyy(i) - sigbzz(i))
@@ -393,25 +402,25 @@
               enddo
               !< Update of the yield stress for kinematic hardening models
               sigy(i) = (one - chard)*sigy(i) + chard*sigy0(i)
-            endif
+            enddo
+          endif
 !
-            !<  f) Equivalent stress update
-            !<  ----------------------------------------------------------------
-            call elasto_plastic_eq_stress(                                     &
-              matparam ,1        ,seq(i)   ,iresp    ,eltype   ,               &
-              signxx(i),signyy(i),signzz(i),signxy(i),signyz(i),signzx(i),     &
-              normxx(i),normyy(i),normzz(i),normxy(i),normyz(i),normzx(i),     &
-              N(i,1,1) ,.false.  )
+          !<  f) Equivalent stress update
+          !<  ----------------------------------------------------------------
+          call elasto_plastic_eq_stress(                                     &
+            matparam ,nel      ,nindx    ,indx     ,iresp    ,eltype   ,     &
+            signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
+            normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
+            N        ,.false.  ,seq      )
 !
+          !< Loop over yielding elements
+#include "vectorize.inc"
+          do ii = 1, nindx
+            i = indx(ii)
             !<  g) Yield function update
             !<  ----------------------------------------------------------------
             phi(i) = (seq(i)/sigy(i))**2 - one
-!
-          enddo
-!
-          !< Update the hourglass stabilization variable
-          do ii = 1, nindx
-            i = indx(ii)
+            !< Update the hourglass stabilization variable
             et(i) = dsigy_dpla(i) / (dsigy_dpla(i) + young(i))
           enddo
 !
@@ -443,9 +452,9 @@
         !=======================================================================
         do i = 1,nel
           if (dpla(i) > zero) then 
-            uvar(i,1) = phi(i)
+            uvar(i,2) = phi(i)
           else
-            uvar(i,1) = zero
+            uvar(i,2) = zero
           endif
         enddo
 !

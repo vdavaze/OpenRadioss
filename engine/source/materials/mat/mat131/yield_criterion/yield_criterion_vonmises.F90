@@ -23,10 +23,10 @@
       module yield_criterion_vonmises_mod
       contains
       subroutine yield_criterion_vonmises(                                     &
-          nel      ,seq      ,eltype   ,                                       &
-          signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
-          normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,         &
-          N        ,second_order)
+              nel      ,nindx    ,indx     ,seq      ,eltype   ,               &
+              signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
+              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
+              N        ,second_order)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -42,6 +42,8 @@
 !  I n p u t   A r g u m e n t s
 !----------------------------------------------------------------
         integer,                       intent(in)    :: nel      !< Number of elements in the group
+        integer,                       intent(in)    :: nindx    !< Number of elements in the group
+        integer, dimension(nel),       intent(in)    :: indx     !< Array of element indices in the group
         real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
         integer,                       intent(in)    :: eltype   !< Element type
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
@@ -61,7 +63,7 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i
+        integer :: i,ii
 !===============================================================================
 !
         !=======================================================================
@@ -69,7 +71,8 @@
         !=======================================================================
         !< Solid element
         if (eltype == 1) then 
-          do i = 1,nel 
+          do ii = 1,nindx
+            i = indx(ii)
             !< Equivalent stress
             seq(i) =  half*(signyy(i)-signzz(i))**2 +                          &                 
                       half*(signzz(i)-signxx(i))**2 +                          & 
@@ -92,7 +95,8 @@
           !< Second order derivative of eq. stress
           if (second_order) then 
             N(1:nel,1:6,1:6) = zero
-            do i = 1,nel
+            do ii = 1,nindx
+              i = indx(ii)
               N(i,1,1) = (one/max(seq(i),em20))*                               & 
                                (one - normxx(i)**2)
               N(i,1,2) = (one/max(seq(i),em20))*                               & 
@@ -121,7 +125,8 @@
           endif      
         !< Shell element
         elseif (eltype == 2) then 
-          do i = 1,nel
+          do ii = 1,nindx
+            i = indx(ii)
             !< Equivalent stress
             seq(i) = signxx(i)**2 + signyy(i)**2 -  signxx(i)*signyy(i)        &
                                                  + three*(signxy(i)**2)
@@ -137,7 +142,8 @@
           !< Second order derivative of eq. stress
           if (second_order) then 
             N(1:nel,1:6,1:6) = zero
-            do i = 1,nel
+            do ii = 1,nindx
+              i = indx(ii)
               N(i,1,1) = (one/max(seq(i),em20))*                               & 
                                (one - normxx(i)**2)
               N(i,1,2) = (one/max(seq(i),em20))*                               & 

@@ -23,10 +23,10 @@
       module elasto_plastic_eq_stress_mod
       contains
       subroutine elasto_plastic_eq_stress(                                     &
-          matparam ,nel      ,seq      ,iresp    ,eltype   ,                   &
+          matparam ,nel      ,nindx    ,indx     ,iresp    ,eltype   ,         &
           signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
           normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,         &
-          N        ,second_order)
+          N        ,second_order,seq   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -47,7 +47,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam !< Material parameters data
         integer,                       intent(in)    :: nel      !< Number of elements in the group
-        real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
+        integer,                       intent(in)    :: nindx    !< Number of elements in the group
+        integer, dimension(nel),       intent(in)    :: indx     !< Array of element indices in the group
         integer,                       intent(in)    :: iresp    !< Precision flag
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
         real(kind=WP), dimension(nel), intent(in)    :: signyy   !< Current stress yy
@@ -64,6 +65,7 @@
         integer,                       intent(in)    :: eltype   !< Element type
         real(kind=WP), dimension(nel,6,6), intent(inout) :: N    !< 2nd derivative of equivalent stress
         logical,                       intent(in)    :: second_order !< Flag for computing second order derivatives
+        real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
@@ -80,7 +82,7 @@
           !---------------------------------------------------------------------
           case(1)
             call yield_criterion_vonmises(                                     &
-              nel      ,seq      ,eltype   ,                                   &
+              nel      ,nindx    ,indx     ,seq      ,eltype   ,               &
               signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
               normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
               N        ,second_order)

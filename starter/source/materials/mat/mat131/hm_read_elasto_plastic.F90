@@ -356,7 +356,7 @@
                              nupar_hard + nupar_ratedep +                      &
                              nupar_therm + nupar_heat + (nupar_kine + 1)
           !< Number of user variables
-          nuvar = 1
+          nuvar = 2
           !< Number of tables and temporary variables
           matparam%ntable = ntab_hard + ntab_srate + ntab_therm + ntab_heat
           nvartmp = nvartmp_hard + nvartmp_srate + nvartmp_therm + nvartmp_heat

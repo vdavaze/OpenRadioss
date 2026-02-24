@@ -23,8 +23,8 @@
       module work_hardening_tabulated_mod
       contains
       subroutine work_hardening_tabulated(                                     &
-        matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,nvartmp  ,&
-        vartmp   )
+        matparam ,nel      ,nindx    ,indx     ,sigy     ,pla      ,epsd     , &
+        dsigy_dpla,nvartmp ,vartmp   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -40,6 +40,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),          intent(in)    :: matparam   !< Material parameters data
         integer,                         intent(in)    :: nel        !< Number of elements in the group
+        integer,                         intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer, dimension(nel),         intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP),   dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP),   dimension(nel), intent(inout) :: pla        !< Cumulated plastic strain
         real(kind=WP),   dimension(nel), intent(in)    :: epsd       !< Strain rate
@@ -49,8 +51,8 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset
-        real(kind=WP) :: xvec(nel,2)
+        integer :: i,ii,offset,ipos(nindx,2)
+        real(kind=WP) :: xvec(nindx,2),sigy_i(nindx),dsigy_dpla_i(nindx)
         logical :: flag_extrap
 !===============================================================================
 !
@@ -61,11 +63,24 @@
         !< Recover flat extrapolation flag from work hardening parameters
         flag_extrap = (matparam%uparam(offset + 1) == 0)
         !< Prepare input vectors for interpolation
-        xvec(1:nel,1) = pla(1:nel)
-        xvec(1:nel,2) = epsd(1:nel)
+#include "vectorize.inc"
+        do ii = 1, nindx
+          i = indx(ii)
+          xvec(ii,1) = pla(i)
+          xvec(ii,2) = epsd(i)
+          ipos(ii,1:2) = vartmp(i,1:2)
+        enddo
         !< Interpolate to get sigy and dsigy_dpla
-        call table_mat_vinterp(matparam%table(1),nel,nel,vartmp(1:nel,1),     &
-          xvec(1:nel,1),sigy(1:nel),dsigy_dpla(1:nel))
+        call table_mat_vinterp(matparam%table(1),nindx,nindx,ipos,xvec,sigy_i, &
+          dsigy_dpla_i,flag_extrap)
+        !< Update sigy and dsigy_dpla
+#include "vectorize.inc"
+        do ii = 1, nindx
+          i = indx(ii)
+          sigy(i) = sigy_i(ii)
+          dsigy_dpla(i) = dsigy_dpla_i(ii)
+          vartmp(i,1:2) = ipos(ii,1:2)
+        enddo
 !
       end subroutine work_hardening_tabulated
       end module work_hardening_tabulated_mod

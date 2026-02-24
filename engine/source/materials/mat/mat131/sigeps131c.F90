@@ -37,8 +37,8 @@
         use constant_mod
         use precision_mod, only : WP
         use nice_shells_mod
-        use cutting_plane_shells_mod
-        use cppm_shells_mod
+        ! use cutting_plane_shells_mod
+        ! use cppm_shells_mod
 !----------------------------------------------------------------
 !   I m p l i c i t   T y p e s
 !----------------------------------------------------------------
@@ -114,29 +114,29 @@
           !---------------------------------------------------------------------
           !< - Cutting Plane algorithm
           !---------------------------------------------------------------------
-          case(2)
-            call cutting_plane_shells(                                         &        
-              nel      ,matparam ,rho      ,nvartmp  ,vartmp   ,               &
-              depsxx   ,depsyy   ,depsxy   ,depsyz   ,depszx   ,               &
-              sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,               &
-              signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,               &
-              soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,     &
-              sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,     &
-              thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,               &
-              nuvar    ,uvar     )
+        !   case(2)
+        !     call cutting_plane_shells(                                         &        
+        !       nel      ,matparam ,rho      ,nvartmp  ,vartmp   ,               &
+        !       depsxx   ,depsyy   ,depsxy   ,depsyz   ,depszx   ,               &
+        !       sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,               &
+        !       signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,               &
+        !       soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,     &
+        !       sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,     &
+        !       thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,               &
+        !       nuvar    ,uvar     )
           !---------------------------------------------------------------------
           !< - Closest Point Projection algorithm
           !---------------------------------------------------------------------     
-          case(3)
-            call cppm_shells(                                                  &        
-              nel      ,matparam ,rho      ,nvartmp  ,vartmp   ,               &
-              depsxx   ,depsyy   ,depsxy   ,depsyz   ,depszx   ,               &
-              sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,               &
-              signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,               &
-              soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,     &
-              sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,     &
-              thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,               &
-              nuvar    ,uvar     )
+        !   case(3)
+        !     call cppm_shells(                                                  &        
+        !       nel      ,matparam ,rho      ,nvartmp  ,vartmp   ,               &
+        !       depsxx   ,depsyy   ,depsxy   ,depsyz   ,depszx   ,               &
+        !       sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,               &
+        !       signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,               &
+        !       soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,     &
+        !       sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,     &
+        !       thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,               &
+        !       nuvar    ,uvar     )
         end select
 !
        end subroutine sigeps131c
