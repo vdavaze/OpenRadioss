@@ -23,8 +23,7 @@
       module self_heating_tabulated_mod
       contains
       subroutine self_heating_tabulated(                                       &
-        matparam ,nel      ,sigy     ,dtemp_dpla,dpla     ,epsd     ,vpflag   ,&
-        timestep ,nvartmp  ,vartmp   )
+        matparam ,nel      ,sigy     ,dtemp_dpla,epsd     ,nvartmp  ,vartmp   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -43,12 +42,9 @@
         integer,                       intent(in)    :: nel        !< Number of elements in the group
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(inout) :: dtemp_dpla !< Derivative of temperature w.r.t. cumulated plastic strain
-        real(kind=WP), dimension(nel), intent(in)    :: dpla       !< Increment of cumulated plastic strain
         real(kind=WP), dimension(nel), intent(in)    :: epsd       !< Equivalent strain rate
-        integer,                       intent(in)    :: vpflag     !< Viscoplastic formulation flag
-        real(kind=WP),                 intent(in)    :: timestep   !< Current time step
         integer,                       intent(in)    :: nvartmp    !< Number of temporary variables used in tabulated self heating
-        integer,dimension(nel,nvartmp),intent(in)    :: vartmp     !< Temporary variables array
+        integer,dimension(nel,nvartmp),intent(inout) :: vartmp     !< Temporary variables array
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
@@ -67,18 +63,13 @@
         cp   = matparam%uparam(offset + 2) !< Thermal massic capacity
         rho  = matparam%rho0               !< Material initial density
         !< Prepare input vectors for interpolation
-        do i = 1,nel
-          xvec(i,1) = epsd(i)
-          ipos(i,1) = vartmp(i,offset_var + 1)
-        enddo
+        xvec(1:nel,1) = epsd(1:nel)
         !< Strain rate weight factor interpolation
-        call table_mat_vinterp(matparam%table(offset+1),nel,nel,ipos,xvec,     &
-          weight,dweight)
-        if (vpflag /= 4) dweight(1:nel) = zero
+        call table_mat_vinterp(matparam%table(offset+1),nel,nel,               &
+          vartmp(1:nel,offset_var+1),xvec,weight,dweight)
         !< Update derivative of temperature w.r.t. cumulated plastic strain
         do i = 1,nel
-          dtemp_dpla(i) = (eta/(rho*cp))*sigy(i)*(dweight(i)*dpla(i)/timestep+ &
-                                                                   weight(i))  
+          dtemp_dpla(i) = (eta/(rho*cp))*sigy(i)*weight(i)
         enddo  
 !
       end subroutine self_heating_tabulated

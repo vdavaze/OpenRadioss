@@ -23,8 +23,7 @@
       module srate_dependency_tabulated_mod
       contains
       subroutine srate_dependency_tabulated(                                   &
-        matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,timestep, &
-        nvartmp  ,vartmp   )
+        matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,nvartmp  ,vartmp   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -42,16 +41,14 @@
         type(matparam_struct_),          intent(in)    :: matparam   !< Material parameters data
         integer,                         intent(in)    :: nel        !< Number of elements in the group
         real(kind=WP),   dimension(nel), intent(inout) :: sigy       !< Equivalent stress
-        real(kind=WP),   dimension(nel), intent(inout) :: epsd       !< Strain rate
+        real(kind=WP),   dimension(nel), intent(in)    :: epsd       !< Strain rate
         real(kind=WP),   dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
-        integer,                         intent(in)    :: vpflag     !< Strain rate dependency flag
-        real(kind=WP),                   intent(in)    :: timestep   !< Time step
         integer,                         intent(in)    :: nvartmp    !< Number of variables used in tabulated strain rate dependency
         integer, dimension(nel,nvartmp), intent(inout) :: vartmp     !< Temporary variables for tabulated strain rate dependency
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,offset,offset_var,ipos(nel,1)
+        integer :: i,offset,offset_var
         real(kind=WP) :: xvec(nel,1),dfact_depsd(nel),srate_fac(nel)
 !===============================================================================
 !
@@ -62,25 +59,15 @@
         offset = matparam%iparam(6)
         offset_var = matparam%iparam(8)
         !< Prepare input vectors for interpolation
-        do i = 1,nel
-          xvec(i,1) = epsd(i)
-          ipos(i,1) = vartmp(i,offset_var + 1)
-        enddo
+        xvec(1:nel,1) = epsd(1:nel)
         !< Interpolate to get srate_fac and dfact_depsd
-        call table_mat_vinterp(matparam%table(offset+1),nel,nel,ipos,xvec,     &
-          srate_fac,dfact_depsd)
+        call table_mat_vinterp(matparam%table(offset+1),nel,nel,               &
+          vartmp(1:nel,offset_var+1),xvec,srate_fac,dfact_depsd)
         !< Update temporary variables
         do i = 1,nel
           sigy(i) = sigy(i)*srate_fac(i)
           dsigy_dpla(i) = dsigy_dpla(i)*srate_fac(i)
-          vartmp(i,offset_var + 1) = ipos(i,1)
         enddo
-        !< For full viscoplasticity, add strain rate contribution to dsigy_dpla
-        if (vpflag == 4) then
-          do i = 1,nel
-            dsigy_dpla(i) = dsigy_dpla(i) + sigy(i)*dfact_depsd(i)*(one/timestep)
-          enddo
-        endif
 !
       end subroutine srate_dependency_tabulated
       end module srate_dependency_tabulated_mod

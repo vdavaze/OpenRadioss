@@ -23,7 +23,7 @@
       module srate_dependency_cowpersymonds_mod
       contains
       subroutine srate_dependency_cowpersymonds(                               &
-        matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,timestep )
+        matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -42,8 +42,6 @@
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(in)    :: epsd       !< Strain rate
         real(kind=WP), dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
-        integer,                       intent(in)    :: vpflag     !< Viscoplastic flag
-        real(kind=WP),                 intent(in)    :: timestep   !< Time step
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
@@ -58,23 +56,12 @@
         !< Recover strain rate dependency parameters
         c = matparam%uparam(offset + 1) !< Cowper-Symonds strain rate sensitivity coefficient
         p = matparam%uparam(offset + 2) !< Strain rate dependency exponent
-        !< Full viscoplastic formulation
-        if (vpflag == 4) then
-          do i = 1,nel
-            ratefac  = one + exp((one/p)*log((epsd(i)+em20)/c))
-            dratefac = (one/(p*timestep*c))*exp(((one/p)-one)*                 &
-                           log((epsd(i)+em20)/c))
-            dsigy_dpla(i) = dsigy_dpla(i)*ratefac + sigy(i)*dratefac
-            sigy(i) = sigy(i)*ratefac
-          enddo
         !< Scaled yield stress formulation
-        else
-          do i = 1,nel
-            ratefac  = one + exp((one/p)*log((epsd(i)+em20)/c))
-            sigy(i) = sigy(i)*ratefac
-            dsigy_dpla(i) = dsigy_dpla(i)*ratefac
-          enddo
-        endif
+        do i = 1,nel
+          ratefac  = one + exp((one/p)*log((epsd(i)+em20)/c))
+          sigy(i) = sigy(i)*ratefac
+          dsigy_dpla(i) = dsigy_dpla(i)*ratefac
+        enddo
 !
       end subroutine srate_dependency_cowpersymonds
       end module srate_dependency_cowpersymonds_mod

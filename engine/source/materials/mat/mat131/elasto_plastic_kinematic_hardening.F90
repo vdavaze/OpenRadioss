@@ -30,8 +30,6 @@
 !   M o d u l e s
 !----------------------------------------------------------------
         use matparam_def_mod
-        use constant_mod
-        use mvsiz_mod
         use precision_mod, only : WP
         use kinematic_hardening_prager_mod
         use kinematic_hardening_chaboche_mod

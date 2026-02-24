@@ -28,8 +28,9 @@
         sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,                     &
         signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,                     &
         soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,           &
-        sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,thkly    , &
-        asrate   ,l_sigb   ,sigb     ,epsd_pg  )
+        sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,           &
+        thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,                     &
+        nuvar    ,uvar     )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -84,10 +85,12 @@
         integer,                       intent(in)    :: l_sigb    !< Size of backstress array
         real(kind=WP),dimension(nel,l_sigb),intent(inout) :: sigb !< Backstress components for kinematic hardening
         real(kind=WP),dimension(nel),  intent(in)    :: epsd_pg   !< Global equivalent strain rate
+        integer,                       intent(in)    :: nuvar     !< Number of user variables
+        real(kind=WP),dimension(nel,nuvar),intent(inout) :: uvar  !< User variables
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,j,ii,iter,nindx,indx(nel),vpflag,idev,ikine
+        integer :: i,j,ii,iter,nindx,indx(nel),vpflag,ikine
         real(kind=WP), dimension(nel,6,6) :: cstf,N
         real(kind=WP) :: dlam,dsigxx_dlam,dsigyy_dlam,dsigxy_dlam,dseq_dlam,   &
           dpla_dlam,dphi_dseq,dphi_dsigy,dphi_dlam,sig_dseqdsig,dsigy_dlam,    &
@@ -118,8 +121,6 @@
         ikine = matparam%iparam(22)
         !< Mixed kinematic/isotropic hardening parameter
         chard = matparam%uparam(matparam%iparam(20) + 1)
-        !< Plastic strain rate for full viscoplastic formulation
-        if (vpflag == 4) epsd(1:nel) = zero
         !< Initialisation of the hourglass control variable
         et(1:nel) = one
         !< Increment of cumulated plastic strain
@@ -136,8 +137,11 @@
         depszz(1:nel) = zero
 !
         !< Total strain-rate computation
-        if ((vpflag > 1).and.(vpflag < 4)) then
+        if (vpflag > 1) then
           epsd(1:nel) = asrate*epsd_pg(1:nel) + (one-asrate)*epsd(1:nel)
+        !< Plastic strain rate recovering
+        else
+          epsd(1:nel) = uvar(1:nel,1)
         endif
 !
         !=======================================================================
@@ -155,8 +159,7 @@
         !=======================================================================
         call elasto_plastic_yield_stress(                                      &
           matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,        &
-          timestep ,nvartmp  ,vartmp   ,vpflag   ,temp     ,dtemp_dpla,        &
-          dpla     )
+          nvartmp  ,vartmp   ,temp     ,dtemp_dpla)
 !
         !=======================================================================
         !< - Backstress tensor computation for kinematic hardening models
@@ -184,8 +187,7 @@
           ipos0(1:nel,1:nvartmp) = 0
           call elasto_plastic_yield_stress(                                    &
             matparam ,nel      ,sigy0    ,zeros    ,epsd     ,dsigy0_dpla,     &
-            timestep ,nvartmp  ,ipos0    ,vpflag   ,temp     ,dtemp0_dpla,     &
-            dpla     )
+            nvartmp  ,ipos0    ,temp     ,dtemp0_dpla)
           !< Update of the yield stress for kinematic hardening models
           sigy(1:nel) = (one - chard)*sigy(1:nel) + chard*sigy0(1:nel)
         endif
@@ -380,8 +382,6 @@
               !<  --------------------------------------------------------------
               !< Equivalent plastic strain increment
               dpla(i) = max(X(2),zero)
-              !< Equivalent plastic strain rate 
-              if (vpflag == 4) epsd(i) = dpla(i)/max(timestep,em20)
               !< Equivalent plastic strain                        
               pla(i)  = pla0(i) + dpla(i)
               !< Temperature
@@ -393,8 +393,7 @@
               !<  --------------------------------------------------------------
               call elasto_plastic_yield_stress(                                &
                 matparam ,1        ,sigy(i)  ,pla(i)   ,epsd(i) ,dsigy_dpla(i),&
-                timestep ,nvartmp  ,vartmp(i,1),vpflag ,temp(i) ,dtemp_dpla(i),&
-                dpla(i)  )
+                nvartmp  ,vartmp(i,1:nvartmp),temp(i) ,dtemp_dpla(i))
 !
               !<  e) Backstress tensor update
               !<  --------------------------------------------------------------
@@ -474,7 +473,8 @@
         !=======================================================================
         if (vpflag == 1) then 
           do i = 1,nel
-            epsd(i) = asrate*dpla(i)/max(timestep,em20) + (one - asrate)*epsd(i)
+            epsd(i) = asrate*dpla(i)/max(timestep,em20) + (one - asrate)*uvar(i,1)
+            uvar(i,1) = epsd(i)
           enddo
         endif
 !

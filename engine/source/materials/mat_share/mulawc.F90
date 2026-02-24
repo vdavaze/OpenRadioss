@@ -1903,7 +1903,7 @@
                   sigoxx   ,sigoyy   ,sigoxy   ,sigoyz   ,sigozx   ,       &
                   signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,       &
                   ssp      ,off      ,lbuf%pla ,dpla     ,lbuf%seq ,       &
-                  etse     ,sigy     ,dt1      ,epsd     ,el_temp  ,       &
+                  etse     ,sigy     ,dt1      ,lbuf%epsd,el_temp  ,       &
                   shf      ,thkn     ,thklyl   ,asrate   ,l_sigb   ,       &
                   lbuf%sigb,epsd_pg  ,nuvar    ,uvar     )
 !

@@ -24,12 +24,11 @@
       contains
       subroutine work_hardening_tabulated(                                     &
         matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,nvartmp  ,&
-        vartmp   ,vpflag   ,timestep )
+        vartmp   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
         use matparam_def_mod
-        use constant_mod
         use table_mat_vinterp_mod
         use precision_mod, only : WP
 !----------------------------------------------------------------
@@ -43,17 +42,15 @@
         integer,                         intent(in)    :: nel        !< Number of elements in the group
         real(kind=WP),   dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP),   dimension(nel), intent(inout) :: pla        !< Cumulated plastic strain
-        real(kind=WP),   dimension(nel), intent(inout) :: epsd       !< Strain rate
+        real(kind=WP),   dimension(nel), intent(in)    :: epsd       !< Strain rate
         real(kind=WP),   dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
         integer,                         intent(in)    :: nvartmp    !< Number of variables used in tabulated hardening
         integer, dimension(nel,nvartmp), intent(inout) :: vartmp     !< Temporary variables for tabulated hardening
-        integer,                         intent(in)    :: vpflag     !< Strain rate dependency flag
-        real(kind=WP),                   intent(in)    :: timestep   !< Time step
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,offset,ipos(nel,2)
-        real(kind=WP) :: xvec(nel,2),dsigy_depsd(nel)
+        integer :: offset
+        real(kind=WP) :: xvec(nel,2)
         logical :: flag_extrap
 !===============================================================================
 !
@@ -64,24 +61,11 @@
         !< Recover flat extrapolation flag from work hardening parameters
         flag_extrap = (matparam%uparam(offset + 1) == 0)
         !< Prepare input vectors for interpolation
-        do i = 1,nel
-          xvec(i,1)   = pla(i)
-          xvec(i,2)   = epsd(i)
-          ipos(i,1:2) = vartmp(i,1:2)
-        enddo
+        xvec(1:nel,1) = pla(1:nel)
+        xvec(1:nel,2) = epsd(1:nel)
         !< Interpolate to get sigy and dsigy_dpla
-        call table_mat_vinterp(matparam%table(1),nel,nel,ipos,xvec,sigy,       &
-          dsigy_dpla,flag_extrap,.false.)
-        !< Update temporary variables
-        do i = 1,nel
-          vartmp(i,1:2) = ipos(i,1:2)
-        enddo
-        !< For full viscoplasticity, add strain rate contribution to dsigy_dpla
-        if (vpflag == 4) then
-          do i = 1,nel
-            dsigy_dpla(i) = dsigy_dpla(i) + dsigy_depsd(i)*(one/timestep)
-          enddo
-        endif
+        call table_mat_vinterp(matparam%table(1),nel,nel,vartmp(1:nel,1),     &
+          xvec(1:nel,1),sigy(1:nel),dsigy_dpla(1:nel))
 !
       end subroutine work_hardening_tabulated
       end module work_hardening_tabulated_mod

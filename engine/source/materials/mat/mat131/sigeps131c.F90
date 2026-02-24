@@ -122,7 +122,8 @@
               signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,               &
               soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,     &
               sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,     &
-              thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  )
+              thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,               &
+              nuvar    ,uvar     )
           !---------------------------------------------------------------------
           !< - Closest Point Projection algorithm
           !---------------------------------------------------------------------     
@@ -134,7 +135,8 @@
               signxx   ,signyy   ,signxy   ,signyz   ,signzx   ,               &
               soundsp  ,off      ,pla      ,dpla     ,seq      ,et       ,     &
               sigy     ,timestep ,epsd     ,temp     ,shf      ,thk      ,     &
-              thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  )
+              thkly    ,asrate   ,l_sigb   ,sigb     ,epsd_pg  ,               &
+              nuvar    ,uvar     )
         end select
 !
        end subroutine sigeps131c

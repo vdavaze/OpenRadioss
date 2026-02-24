@@ -32,7 +32,6 @@
 !----------------------------------------------------------------
         use matparam_def_mod
         use constant_mod
-        use mvsiz_mod
         use precision_mod, only : WP
         use yield_criterion_vonmises_mod
         use yield_criterion_hershey_mod

@@ -77,13 +77,8 @@
           !< Viscous formulation
           vpflag = min(max(vpflag,0),4)
           if (vpflag == 0) vpflag = 2
-          if (vpflag < 4) then
-            israte = 1
-          else
-            israte = 0
-          endif
+          israte = 1
           if (fcut   == zero) fcut = 10000.0d0*unitab%fac_t_work
-          if (vpflag == 4)    fcut = zero
           !< Parmat global table
           parmat(4) = israte
           parmat(5) = fcut
@@ -104,9 +99,7 @@
           5X,'    = 1: SCALED YIELD STRESS WITH PLASTIC STRAIN RATE   ',/,     &
           5X,'    = 2: SCALED YIELD STRESS WITH TOTAL STRAIN RATE     ',/,     &
           5X,'    = 3: SCALED YIELD STRESS WITH DEVIATORIC STRAIN RATE',/,     &
-          5X,'    = 4: FULL VISCOPLASTIC FORMULATION                  ',/,     &
-          5X,'STRAIN RATE FILTERING FREQUENCY (FCUT). . . . . . . . .=',1PG20.13/&
-          5X,'  (ONLY USED FOR VPFLAG = 1,2,3)                        '/)
+          5X,'STRAIN RATE FILTERING FREQUENCY (FCUT). . . . . . . . .=',1PG20.13/)
 ! -------------------------------------------------------------------------------
         end subroutine hm_read_srate_dependency_nonlinear
       end module hm_read_srate_dependency_nonlinear_mod

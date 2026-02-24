@@ -23,13 +23,12 @@
       module elasto_plastic_yield_stress_mod
       contains
       subroutine elasto_plastic_yield_stress(                                  &
-        matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,timestep, &
-        nvartmp  ,vartmp   ,vpflag   ,temp     ,dtemp_dpla,dpla     )
+        matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,nvartmp  ,&
+        vartmp   ,temp     ,dtemp_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
         use matparam_def_mod
-        use constant_mod
         use precision_mod, only : WP
         use work_hardening_powerlaw_mod
         use work_hardening_voce_mod
@@ -55,15 +54,12 @@
         integer,                         intent(in)    :: nel        !< Number of elements in the group
         real(kind=WP), dimension(nel),   intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel),   intent(inout) :: pla        !< Cumulated plastic strain
-        real(kind=WP), dimension(nel),   intent(inout) :: epsd       !< Strain rate
+        real(kind=WP), dimension(nel),   intent(in)    :: epsd       !< Strain rate
         real(kind=WP), dimension(nel),   intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
-        real(kind=WP),                   intent(in)    :: timestep   !< Time step
         integer,                         intent(in)    :: nvartmp    !< Number of variables used in tabulated hardening
         integer, dimension(nel,nvartmp), intent(inout) :: vartmp     !< Temporary variables for tabulated hardening
-        integer,                         intent(in)    :: vpflag     !< Viscoplastic flag
         real(kind=WP), dimension(nel),   intent(inout) :: temp       !< Temperature
         real(kind=WP), dimension(nel),   intent(out)   :: dtemp_dpla !< Derivative of temperature w.r.t. cumulated plastic strain
-        real(kind=WP), dimension(nel),   intent(in)    :: dpla       !< Increment of cumulated plastic strain
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
@@ -93,7 +89,7 @@
           case(3)
             call work_hardening_tabulated(                                     &
               matparam ,nel      ,sigy     ,pla      ,epsd     ,dsigy_dpla,    &
-              nvartmp  ,vartmp   ,vpflag   ,timestep )
+              nvartmp  ,vartmp   )
           !---------------------------------------------------------------------
           !< Linear-Voce work hardening
           !---------------------------------------------------------------------
@@ -112,29 +108,26 @@
           !---------------------------------------------------------------------
           case(1)
             call srate_dependency_johnsoncook(                                 &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,    &
-              timestep )
+              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
           !---------------------------------------------------------------------
           !< Cowper-Symonds strain rate dependency
           !---------------------------------------------------------------------
           case(2)
             call srate_dependency_cowpersymonds(                               &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,    &
-              timestep )
+              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
           !---------------------------------------------------------------------
           !< Tabulated strain rate dependency
           !---------------------------------------------------------------------
           case(3)
             call srate_dependency_tabulated(                                   &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,    &
-              timestep ,nvartmp  ,vartmp   )
+              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,nvartmp  ,    &
+              vartmp   )
           !---------------------------------------------------------------------
           !< Non-linear strain rate dependency
           !---------------------------------------------------------------------
           case(4)
             call srate_dependency_nonlinear(                                   &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,vpflag   ,    &
-              timestep )
+              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
         end select 
 !
         !=======================================================================
@@ -147,15 +140,13 @@
           !---------------------------------------------------------------------
           case (1)
             call self_heating_taylor(                                          &
-              matparam ,nel     ,sigy    ,dtemp_dpla,dpla   ,epsd   ,vpflag ,  &
-              timestep)
+              matparam ,nel     ,sigy    ,dtemp_dpla,epsd   )
           !---------------------------------------------------------------------
           !< Tabulated self heating
           !---------------------------------------------------------------------
           case (2)
             call self_heating_tabulated(                                       &
-              matparam ,nel     ,sigy    ,dtemp_dpla,dpla   ,epsd   ,vpflag ,  &
-              timestep ,nvartmp ,vartmp  )
+              matparam ,nel     ,sigy    ,dtemp_dpla,epsd   ,nvartmp ,vartmp  )
         end select
 !
         !=======================================================================

@@ -23,8 +23,7 @@
       module self_heating_taylor_mod
       contains
       subroutine self_heating_taylor(                                          &
-        matparam ,nel      ,sigy     ,dtemp_dpla,dpla     ,epsd     ,vpflag   ,&
-        timestep )
+        matparam ,nel      ,sigy     ,dtemp_dpla,epsd     )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -42,16 +41,13 @@
         integer,                       intent(in)    :: nel        !< Number of elements in the group
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(inout) :: dtemp_dpla !< Derivative of temperature w.r.t. cumulated plastic strain
-        real(kind=WP), dimension(nel), intent(in)    :: dpla       !< Increment of cumulated plastic strain
         real(kind=WP), dimension(nel), intent(in)    :: epsd       !< Equivalent strain rate
-        integer,                       intent(in)    :: vpflag     !< Viscoplastic formulation flag
-        real(kind=WP),                 intent(in)    :: timestep   !< Current time step
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
         integer :: offset,i
         real(kind=WP) :: eta,cp,deis,dead,rho
-        real(kind=WP), dimension(nel) :: weight,dweight
+        real(kind=WP), dimension(nel) :: weight
 !===============================================================================
 !
         !=======================================================================
@@ -65,38 +61,18 @@
         dead = matparam%uparam(offset + 4) !< Strain rates for the end of adiabatic transition
         rho  = matparam%rho0               !< Material initial density
         !< Strain rate weight factor computation
-        if (vpflag /= 4) then
-          do i = 1,nel
-            if (epsd(i) < deis) then
-              weight(i) = zero
-            elseif (epsd(i) > dead) then
-              weight(i) = one
-            else
-              weight(i) = ((epsd(i)-deis)**2)*(three*dead - two*epsd(i) - deis)&
-                                                              /((dead-deis)**3)
-            endif
-            dweight(i) = zero
-          enddo
-        else
-          do i = 1,nel
-            if (epsd(i) < deis) then
-              weight(i)  = zero
-              dweight(i) = zero
-            elseif (epsd(i) > dead) then
-              weight(i)  = one
-              dweight(i) = zero
-            else
-              weight(i) = ((epsd(i)-deis)**2)*(three*dead - two*epsd(i) - deis)&
-                                                              /((dead-deis)**3)
-              dweight(i) = (six*(epsd(i)-deis)*(dead - epsd(i)))/              &
-                                     (timestep*((dead-deis)**3))
-            endif
-          enddo
-        endif
-        !< Update derivative of temperature w.r.t. cumulated plastic strain
         do i = 1,nel
-          dtemp_dpla(i) = (eta/(rho*cp))*sigy(i)*(dweight(i)*dpla(i) + weight(i))  
-        enddo  
+          if (epsd(i) < deis) then
+            weight(i) = zero
+          elseif (epsd(i) > dead) then
+            weight(i) = one
+          else
+            weight(i) = ((epsd(i)-deis)**2)*(three*dead - two*epsd(i) - deis)&
+                                                            /((dead-deis)**3)
+          endif
+          !< Update derivative of temperature w.r.t. cumulated plastic strain
+          dtemp_dpla(i) = (eta/(rho*cp))*sigy(i)*weight(i)
+        enddo
 !
       end subroutine self_heating_taylor
       end module self_heating_taylor_mod

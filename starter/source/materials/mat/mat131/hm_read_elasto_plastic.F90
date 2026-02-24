@@ -101,6 +101,7 @@
           !---------------------------------------------------------------------
           !< Initialize local variables
           !---------------------------------------------------------------------
+          ! -> Key type
           ielas         = 0
           icrit         = 0
           ihard         = 0
@@ -108,6 +109,7 @@
           itherm        = 0
           iheat         = 0
           ikine         = 0
+          ! -> Number of parameters
           nupar_elas    = 0
           nupar_crit    = 0
           nupar_hard    = 0
@@ -115,19 +117,24 @@
           nupar_therm   = 0
           nupar_heat    = 0
           nupar_kine    = 0
+          ! -> Number of tables
           ntab_hard     = 0
-          nvartmp_hard  = 0
-          itab_hard     = 0
           ntab_srate    = 0
-          nvartmp_srate = 0
-          itab_srate    = 0
           ntab_therm    = 0
-          nvartmp_therm = 0
-          itab_therm    = 0
           ntab_heat     = 0
-          nvartmp_heat  = 0
+          ! -> Id of tables
+          itab_hard     = 0
+          itab_srate    = 0
+          itab_therm    = 0
           itab_heat     = 0
+          ! -> Number of temporary variables
+          nvartmp_hard  = 0
+          nvartmp_srate = 0
+          nvartmp_therm = 0
+          nvartmp_heat  = 0
+          ! -> Iso-kinetic hardening parameter
           chard         = 0
+          ! -> Scale factors for tables
           x2vect_hard   = zero
           x3vect_hard   = zero
           x4vect_hard   = zero
@@ -144,6 +151,7 @@
           x3vect_heat   = zero
           x4vect_heat   = zero
           fscale_heat   = zero
+          ! -> User parameters
           upar_elas     = zero
           upar_crit     = zero
           upar_hard     = zero
