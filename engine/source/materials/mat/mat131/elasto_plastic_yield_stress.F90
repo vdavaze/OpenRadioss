@@ -78,13 +78,15 @@
           !---------------------------------------------------------------------
           case(1)
             call work_hardening_powerlaw(                                      &
-              matparam ,nel      ,sigy     ,pla      ,dsigy_dpla)
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,pla      ,    &
+              dsigy_dpla)
           !---------------------------------------------------------------------
           !< Voce work hardening
           !---------------------------------------------------------------------
           case(2)
             call work_hardening_voce(                                          &
-              matparam ,nel      ,sigy     ,pla      ,dsigy_dpla)
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,pla      ,    &
+              dsigy_dpla)
           !---------------------------------------------------------------------
           !< Tabulated work hardening
           !---------------------------------------------------------------------
@@ -97,7 +99,8 @@
           !---------------------------------------------------------------------
           case(4)
             call work_hardening_linearvoce(                                    &
-              matparam ,nel      ,sigy     ,pla      ,dsigy_dpla)
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,pla      ,    &
+              dsigy_dpla)
         end select
 !
         !=======================================================================
@@ -110,26 +113,29 @@
           !---------------------------------------------------------------------
           case(1)
             call srate_dependency_johnsoncook(                                 &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,epsd     ,    &
+              dsigy_dpla)
           !---------------------------------------------------------------------
           !< Cowper-Symonds strain rate dependency
           !---------------------------------------------------------------------
           case(2)
             call srate_dependency_cowpersymonds(                               &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,epsd     ,    &
+              dsigy_dpla)
           !---------------------------------------------------------------------
           !< Tabulated strain rate dependency
           !---------------------------------------------------------------------
           case(3)
             call srate_dependency_tabulated(                                   &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla,nvartmp  ,    &
-              vartmp   )
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,epsd     ,    &
+              dsigy_dpla,nvartmp ,vartmp    )
           !---------------------------------------------------------------------
           !< Non-linear strain rate dependency
           !---------------------------------------------------------------------
           case(4)
             call srate_dependency_nonlinear(                                   &
-              matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
+              matparam ,nel      ,nindx     ,indx     ,sigy     ,epsd     ,    &
+              dsigy_dpla)
         end select 
 !
         !=======================================================================
@@ -142,13 +148,15 @@
           !---------------------------------------------------------------------
           case (1)
             call self_heating_taylor(                                          &
-              matparam ,nel     ,sigy    ,dtemp_dpla,epsd   )
+              matparam ,nel      ,nindx    ,indx     ,sigy    ,dtemp_dpla,     &
+              epsd   )
           !---------------------------------------------------------------------
           !< Tabulated self heating
           !---------------------------------------------------------------------
           case (2)
             call self_heating_tabulated(                                       &
-              matparam ,nel     ,sigy    ,dtemp_dpla,epsd   ,nvartmp ,vartmp  )
+              matparam ,nel      ,nindx    ,indx     ,sigy    ,dtemp_dpla,     &
+              epsd   ,nvartmp ,vartmp  )
         end select
 !
         !=======================================================================
@@ -161,20 +169,22 @@
           !---------------------------------------------------------------------
           case(1)
             call therm_softening_johnsoncook(                                  &
-              matparam ,nel      ,sigy     ,temp     ,dsigy_dpla,dtemp_dpla   )
+              matparam ,nel      ,nindx    ,indx     ,sigy     ,temp     ,     &
+              dsigy_dpla,dtemp_dpla   )
           !---------------------------------------------------------------------
           !< Zhao thermal softening
           !---------------------------------------------------------------------
           case(2)
             call therm_softening_zhao(                                         &
-              matparam ,nel      ,sigy     ,temp     ,dsigy_dpla,dtemp_dpla   )
+              matparam ,nel      ,nindx    ,indx     ,sigy     ,temp     ,     &
+              dsigy_dpla,dtemp_dpla   )
           !---------------------------------------------------------------------
           !< Tabulated thermal softening
           !---------------------------------------------------------------------
           case(3)
             call therm_softening_tabulated(                                    &
-              matparam ,nel      ,sigy     ,temp     ,dsigy_dpla,dtemp_dpla   ,&
-              nvartmp  ,vartmp   )
+              matparam ,nel      ,nindx    ,indx     ,sigy     ,temp     ,     &
+              dsigy_dpla,dtemp_dpla   ,nvartmp  ,vartmp   )
         end select
 !
       end subroutine elasto_plastic_yield_stress

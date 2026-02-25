@@ -25,8 +25,7 @@
       subroutine yield_criterion_vonmises(                                     &
               nel      ,nindx    ,indx     ,seq      ,eltype   ,               &
               signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
-              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
-              N        ,second_order)
+              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -42,8 +41,8 @@
 !  I n p u t   A r g u m e n t s
 !----------------------------------------------------------------
         integer,                       intent(in)    :: nel      !< Number of elements in the group
-        integer,                       intent(in)    :: nindx    !< Number of elements in the group
-        integer, dimension(nel),       intent(in)    :: indx     !< Array of element indices in the group
+        integer,                       intent(in)    :: nindx    !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx     !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
         integer,                       intent(in)    :: eltype   !< Element type
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
@@ -58,8 +57,6 @@
         real(kind=WP), dimension(nel), intent(inout) :: normxy   !< 1st derivative of equivalent stress wrt stress xy
         real(kind=WP), dimension(nel), intent(inout) :: normyz   !< 1st derivative of equivalent stress wrt stress yz
         real(kind=WP), dimension(nel), intent(inout) :: normzx   !< 1st derivative of equivalent stress wrt stress zx
-        real(kind=WP), dimension(nel,6,6), intent(inout) :: N    !< 2nd derivative of equivalent stress
-        logical,                       intent(in)    :: second_order !< Flag for computing second order derivatives
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
@@ -71,6 +68,7 @@
         !=======================================================================
         !< Solid element
         if (eltype == 1) then 
+#include "vectorize.inc"
           do ii = 1,nindx
             i = indx(ii)
             !< Equivalent stress
@@ -91,40 +89,10 @@
             normxy(i) = (one/max(seq(i),em20))*three*signxy(i)
             normyz(i) = (one/max(seq(i),em20))*three*signyz(i)
             normzx(i) = (one/max(seq(i),em20))*three*signzx(i)              
-          enddo
-          !< Second order derivative of eq. stress
-          if (second_order) then 
-            N(1:nel,1:6,1:6) = zero
-            do ii = 1,nindx
-              i = indx(ii)
-              N(i,1,1) = (one/max(seq(i),em20))*                               & 
-                               (one - normxx(i)**2)
-              N(i,1,2) = (one/max(seq(i),em20))*                               & 
-                            (- half - normyy(i)*normxx(i))
-              N(i,1,3) = (one/max(seq(i),em20))*                               & 
-                            (- half - normzz(i)*normxx(i))
-              N(i,2,1) = (one/max(seq(i),em20))*                               & 
-                            (- half - normxx(i)*normyy(i))
-              N(i,2,2) = (one/max(seq(i),em20))*                               & 
-                               (one - normyy(i)**2)
-              N(i,2,3) = (one/max(seq(i),em20))*                               & 
-                            (- half - normzz(i)*normyy(i))
-              N(i,3,1) = (one/max(seq(i),em20))*                               & 
-                            (- half - normxx(i)*normzz(i))
-              N(i,3,2) = (one/max(seq(i),em20))*                               & 
-                            (- half - normyy(i)*normzz(i))
-              N(i,3,3) = (one/max(seq(i),em20))*                               & 
-                               (one - normzz(i)**2)
-              N(i,4,4) = (one/max(seq(i),em20))*                               & 
-                             (three - normxy(i)**2)
-              N(i,5,5) = (one/max(seq(i),em20))*                               & 
-                             (three - normyz(i)**2)
-              N(i,6,6) = (one/max(seq(i),em20))*                               & 
-                             (three - normzx(i)**2)              
-            enddo  
-          endif      
+          enddo 
         !< Shell element
         elseif (eltype == 2) then 
+#include "vectorize.inc"
           do ii = 1,nindx
             i = indx(ii)
             !< Equivalent stress
@@ -139,23 +107,6 @@
             normyz(i) = zero
             normzx(i) = zero
           enddo
-          !< Second order derivative of eq. stress
-          if (second_order) then 
-            N(1:nel,1:6,1:6) = zero
-            do ii = 1,nindx
-              i = indx(ii)
-              N(i,1,1) = (one/max(seq(i),em20))*                               & 
-                               (one - normxx(i)**2)
-              N(i,1,2) = (one/max(seq(i),em20))*                               & 
-                            (- half - normyy(i)*normxx(i))
-              N(i,2,1) = (one/max(seq(i),em20))*                               & 
-                            (- half - normxx(i)*normyy(i))
-              N(i,2,2) = (one/max(seq(i),em20))*                               & 
-                               (one - normyy(i)**2)
-              N(i,4,4) = (one/max(seq(i),em20))*                               & 
-                             (three - normxy(i)**2)            
-            enddo  
-          endif    
         endif
 !
       end subroutine yield_criterion_vonmises

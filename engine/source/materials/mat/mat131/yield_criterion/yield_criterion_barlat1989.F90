@@ -23,7 +23,8 @@
       module yield_criterion_barlat1989_mod
       contains
       subroutine yield_criterion_barlat1989(                                   &
-          matparam ,nel      ,seq      ,signxx   ,signyy   ,signxy   ,         &
+          matparam ,nel      ,nindx    ,indx     ,seq      ,                   &
+          signxx   ,signyy   ,signxy   ,                                       &
           normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
 !----------------------------------------------------------------
 !   M o d u l e s
@@ -42,6 +43,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam !< Material parameters data
         integer,                       intent(in)    :: nel      !< Number of elements in the group
+        integer,                       intent(in)    :: nindx    !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx     !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
         real(kind=WP), dimension(nel), intent(in)    :: signyy   !< Current stress yy
@@ -55,7 +58,7 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: a,c,h,m,p
         real(kind=WP),dimension(nel) :: normsig,k1,k2
         real(kind=WP) :: dseq_dk1,dseq_dk2,dk1_dsigxx,dk1_dsigyy,dk2_dsigxx,   &
@@ -73,7 +76,9 @@
         p = matparam%uparam(offset + 4)
         m = matparam%uparam(offset + 5)
         !< Shell element
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1,nindx
+          i = indx(ii)
           !< Norm of the stress tensor
           normsig(i) = signxx(i)*signxx(i)                                     &
                      + signyy(i)*signyy(i)                                     &

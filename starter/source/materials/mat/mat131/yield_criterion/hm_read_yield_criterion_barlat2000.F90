@@ -110,6 +110,7 @@
             call hm_get_float_array_index("CRIT_BARL00_RB"   ,rb   ,ikey,is_available,lsubmodel,unitab)
             call hm_get_float_array_index("CRIT_BARL00_AXP"  ,expa ,ikey,is_available,lsubmodel,unitab)
             if (expa == zero) expa = two
+            expam2 = expa - 2
 !
             !< Start newton loops to find al parameters from 1 to 6
             residu  = ep30
@@ -328,18 +329,20 @@
               c1=titr)
           endif
           !< Number of parameters
-          nupar_crit = 9
-          !< Save elastic parameters
-          upar_crit(1) = al(1)
-          upar_crit(2) = al(2)
-          upar_crit(3) = al(3)
-          upar_crit(4) = al(4)
-          upar_crit(5) = al(5)
-          upar_crit(6) = al(6)
-          upar_crit(7) = al(7)
-          upar_crit(8) = al(8)
-          upar_crit(9) = expa
-          !< Printing elastic parameters
+          nupar_crit = 11
+          !< Save yield criterion parameters
+          upar_crit(1)  = two*al(1)/three
+          upar_crit(2)  = -al(1)/three
+          upar_crit(3)  = -al(2)/three
+          upar_crit(4)  = two*al(2)/three
+          upar_crit(5)  = al(7)
+          upar_crit(6)  = (-two*al(3) +   two*al(4) + eight*al(5) -  two*al(6))/nine
+          upar_crit(7)  = (     al(3) -  four*al(4) -  four*al(5) + four*al(6))/nine
+          upar_crit(8)  = (four*al(3) -  four*al(4) -  four*al(5) +      al(6))/nine
+          upar_crit(9)  = (-two*al(3) + eight*al(4) +   two*al(5) -  two*al(6))/nine
+          upar_crit(10) = al(8)
+          upar_crit(11) = expa
+          !< Printing yield criterion parameters
           if (is_encrypted) then
             write(iout,"(5X,A,//)") "CONFIDENTIAL DATA"
           else

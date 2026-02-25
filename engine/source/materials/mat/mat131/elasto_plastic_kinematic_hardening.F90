@@ -23,9 +23,9 @@
       module elasto_plastic_kinematic_hardening_mod
       contains
       subroutine elasto_plastic_kinematic_hardening(                           &
-          matparam ,nel      ,l_sigb   ,dsigb_dlam,dsigy_dpla,chard    ,       &
-          normxx   ,normyy   ,normzz   ,normxy    ,normyz    ,normzx   ,       &
-          dpla_dlam,sigb     ,eltype   )
+          matparam ,nel      ,nindx    ,indx     ,                             &
+          l_sigb   ,dsigb_dlam,dsigy_dpla,chard  ,dpla_dlam,sigb     ,         &
+          normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -42,19 +42,20 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
         integer,                       intent(in)    :: nel        !< Number of elements in the group
+        integer,                       intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         integer,                       intent(in)    :: l_sigb     !< Number of backstress components
         real(kind=WP),dimension(nel,l_sigb),intent(inout) :: dsigb_dlam !< Backstress components for kinematic hardening
         real(kind=WP), dimension(nel), intent(in)    :: dsigy_dpla !< Derivative of yield stress wrt equivalent plastic strain
         real(kind=WP),                 intent(in)    :: chard      !< Mixed hardening parameter
+        real(kind=WP), dimension(nel), intent(in)    :: dpla_dlam  !< Derivative of equivalent plastic strain w.r.t plastic multiplier
+        real(kind=WP), dimension(nel,l_sigb),intent(in) :: sigb    !< Backstress components for kinematic hardening
         real(kind=WP), dimension(nel), intent(in)    :: normxx     !< 1st derivative of equivalent stress wrt stress xx
         real(kind=WP), dimension(nel), intent(in)    :: normyy     !< 1st derivative of equivalent stress wrt stress yy
         real(kind=WP), dimension(nel), intent(in)    :: normzz     !< 1st derivative of equivalent stress wrt stress zz
         real(kind=WP), dimension(nel), intent(in)    :: normxy     !< 1st derivative of equivalent stress wrt stress xy
         real(kind=WP), dimension(nel), intent(in)    :: normyz     !< 1st derivative of equivalent stress wrt stress yz
         real(kind=WP), dimension(nel), intent(in)    :: normzx     !< 1st derivative of equivalent stress wrt stress zx
-        real(kind=WP),                 intent(in)    :: dpla_dlam  !< Derivative of equivalent plastic strain w.r.t plastic multiplier
-        real(kind=WP), dimension(nel,l_sigb),intent(in) :: sigb    !< Backstress components for kinematic hardening
-        integer,                       intent(in)    :: eltype     !< Element type
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
@@ -71,16 +72,17 @@
           !---------------------------------------------------------------------
           case(1)
             call kinematic_hardening_prager(                                   &
-              nel      ,l_sigb   ,dsigb_dlam,dsigy_dpla,chard    ,eltype   ,   &
-              normxx   ,normyy   ,normzz   ,normxy    ,normyz    ,normzx   )
+              nel      ,nindx    ,indx     ,l_sigb    ,dsigb_dlam,dsigy_dpla,  &
+              normxx   ,normyy   ,normzz   ,normxy    ,normyz    ,normzx    ,  &
+              chard    )
           !---------------------------------------------------------------------
           !< Chaboche-Rousselier kinematic hardening model
           !---------------------------------------------------------------------
           case(2)
             call kinematic_hardening_chaboche(                                 &
-              matparam ,nel      ,l_sigb   ,dsigb_dlam,sigb      ,chard    ,   &
+              matparam ,nel      ,nindx    ,indx      ,l_sigb   ,dsigb_dlam,   &
               normxx   ,normyy   ,normzz   ,normxy    ,normyz    ,normzx   ,   &
-              dpla_dlam)
+              chard    ,sigb     ,dpla_dlam)
         end select
 !
       end subroutine elasto_plastic_kinematic_hardening

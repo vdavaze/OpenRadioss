@@ -23,8 +23,8 @@
       module therm_softening_tabulated_mod
       contains
       subroutine therm_softening_tabulated(                                    &
-        matparam ,nel      ,sigy     ,temp     ,dsigy_dpla,dtemp_dpla,         &
-        nvartmp  ,vartmp   )
+        matparam ,nel      ,nindx    ,indx     ,sigy     ,temp     ,dsigy_dpla,&
+        dtemp_dpla,nvartmp ,vartmp   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -41,6 +41,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),          intent(in)    :: matparam   !< Material parameters data
         integer,                         intent(in)    :: nel        !< Number of elements in the group
+        integer,                         intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer,         dimension(nel), intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP),   dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP),   dimension(nel), intent(inout) :: temp       !< Temperature
         real(kind=WP),   dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
@@ -50,8 +52,8 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,offset,offset_var,ipos(nel,1)
-        real(kind=WP) :: xvec(nel,1),thermfac(nel),dthermfac(nel)
+        integer :: i,ii,offset,offset_var,ipos(nindx,1)
+        real(kind=WP) :: xvec(nindx,1),thermfac(nindx),dthermfac(nindx)
 !===============================================================================
 !
         !=======================================================================
@@ -61,19 +63,23 @@
         offset = matparam%iparam(11)
         offset_var = matparam%iparam(13)
         !< Prepare input vectors for interpolation
-        do i = 1,nel
-          xvec(i,1) = temp(i)
-          ipos(i,1) = vartmp(i,offset_var + 1)
+#include "vectorize.inc"
+        do ii = 1, nindx
+          i = indx(ii)
+          xvec(ii,1) = temp(i)
+          ipos(ii,1) = vartmp(i,offset_var+1)
         enddo
         !< Interpolate to get thermfac and dthermfac
-        call table_mat_vinterp(matparam%table(offset+1),nel,nel,ipos,xvec,     &
+        call table_mat_vinterp(matparam%table(offset+1),nindx,nindx,ipos,xvec, &
           thermfac,dthermfac)
         !< Update temporary variables
-        do i = 1,nel
-          dsigy_dpla(i) = dsigy_dpla(i)*thermfac(i) +                          &
-                               sigy(i)*dthermfac(i)*dtemp_dpla(i)
-          sigy(i) = sigy(i)*thermfac(i)
-          vartmp(i,offset_var + 1) = ipos(i,1)
+#include "vectorize.inc"
+        do ii = 1, nindx
+          i = indx(ii)
+          dsigy_dpla(i) = dsigy_dpla(i)*thermfac(ii) +                         &
+                               sigy(i)*dthermfac(ii)*dtemp_dpla(i)
+          sigy(i) = sigy(i)*thermfac(ii)
+          vartmp(i,offset_var + 1) = ipos(ii,1)
         enddo
 !
       end subroutine therm_softening_tabulated

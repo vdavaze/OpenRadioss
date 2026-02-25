@@ -23,7 +23,7 @@
       module work_hardening_powerlaw_mod
       contains
       subroutine work_hardening_powerlaw(                                      &
-        matparam ,nel      ,sigy     ,pla      ,dsigy_dpla)
+        matparam ,nel      ,nindx     ,indx     ,sigy     ,pla      ,dsigy_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -39,13 +39,15 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
         integer,                       intent(in)    :: nel        !< Number of elements in the group
+        integer,                       intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer, dimension(nel),       intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(inout) :: pla        !< Cumulated plastic strain
         real(kind=WP), dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: ca,cb,cn,eps0
 !===============================================================================
 !
@@ -58,7 +60,9 @@
         cb   = matparam%uparam(offset + 2) !< Hardening modulus
         cn   = matparam%uparam(offset + 3) !< Hardening exponent
         eps0 = matparam%uparam(offset + 4) !< Initial plastic strain
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1,nindx
+          i = indx(ii)
           sigy(i) = ca + cb*exp(cn*log(pla(i) + eps0))
           dsigy_dpla(i) = cn*cb*exp((cn-1)*log(pla(i) + eps0))
         enddo

@@ -23,7 +23,8 @@
       module yield_criterion_barlat2000_mod
       contains
       subroutine yield_criterion_barlat2000(                                   &
-          matparam ,nel      ,seq      ,signxx   ,signyy   ,signxy   ,         &
+          matparam ,nel      ,nindx    ,indx     ,seq      ,                   &
+          signxx   ,signyy   ,signxy   ,                                       &
           normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
 !----------------------------------------------------------------
 !   M o d u l e s
@@ -42,6 +43,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam !< Material parameters data
         integer,                       intent(in)    :: nel      !< Number of elements in the group
+        integer,                       intent(in)    :: nindx    !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx     !< Indices
         real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
         real(kind=WP), dimension(nel), intent(in)    :: signyy   !< Current stress yy
@@ -55,8 +58,8 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
-        real(kind=WP) :: al1,al2,al3,al4,al5,al6,al7,al8,expa
+        integer :: offset,i,ii
+        real(kind=WP) :: expa
         real(kind=WP) :: lp11,lp12,lp21,lp22,lp66
         real(kind=WP) :: lpp11,lpp12,lpp21,lpp22,lpp66
         real(kind=WP) :: xpxx(nel),xpyy(nel),xpxy(nel)
@@ -73,155 +76,145 @@
 !===============================================================================
 !
         !=======================================================================
-        !< - Barlat (1989) yield criterion and its derivatives
+        !< - Barlat (2000) yield criterion and its derivatives
         !=======================================================================
         offset = matparam%iparam(2)
         !< Barlat 2000 coefficients
-        al1  = matparam%uparam(offset + 1)
-        al2  = matparam%uparam(offset + 2)
-        al3  = matparam%uparam(offset + 3)
-        al4  = matparam%uparam(offset + 4)
-        al5  = matparam%uparam(offset + 5)
-        al6  = matparam%uparam(offset + 6)
-        al7  = matparam%uparam(offset + 7)
-        al8  = matparam%uparam(offset + 8)
-        expa = matparam%uparam(offset + 9)
-!
-        !< Barlat linear projection parameters
-        !< - For xprime tensor
-        lp11  = two*al1/three
-        lp12  = -al1/three
-        lp21  = -al2/three
-        lp22  = two*al2/three
-        lp66  = al7
-        !< - For xprimeprime tensor
-        lpp11 = (-two*al3 +   two*al4 + eight*al5 -  two*al6)/nine
-        lpp12 = (     al3 -  four*al4 -  four*al5 + four*al6)/nine
-        lpp21 = (four*al3 -  four*al4 -  four*al5 +      al6)/nine
-        lpp22 = (-two*al3 + eight*al4 +   two*al5 -  two*al6)/nine
-        lpp66 =  al8
+        lp11  = matparam%uparam(offset + 1)
+        lp12  = matparam%uparam(offset + 2)
+        lp21  = matparam%uparam(offset + 3)
+        lp22  = matparam%uparam(offset + 4)
+        lp66  = matparam%uparam(offset + 5)
+        lpp11 = matparam%uparam(offset + 6)
+        lpp12 = matparam%uparam(offset + 7)
+        lpp21 = matparam%uparam(offset + 8)
+        lpp22 = matparam%uparam(offset + 9)
+        lpp66 = matparam%uparam(offset + 10)
+        expa  = matparam%uparam(offset + 11)
 !
         !< Shell element
-        do i = 1,nel
-            !< Norm of the stress tensor
-            normsig(i) = signxx(i)*signxx(i)                                   & 
-                       + signyy(i)*signyy(i)                                   &
-                   + two*signxy(i)*signxy(i)
-            normsig(i) = sqrt(normsig(i))
-            normsig(i) =  max(normsig(i),one)
+#include "vectorize.inc"
+        do ii = 1,nindx
+          i = indx(ii)
+          !< Norm of the stress tensor
+          normsig(i) = signxx(i)*signxx(i)                                     & 
+                     + signyy(i)*signyy(i)                                     &
+                 + two*signxy(i)*signxy(i)
+          normsig(i) = sqrt(normsig(i))
+          normsig(i) =  max(normsig(i),one)
 !
-            !< Computation of the xprime and xprimeprime tensors
-            xpxx(i)  = (lp11*signxx(i) + lp12*signyy(i))/normsig(i)
-            xpyy(i)  = (lp21*signxx(i) + lp22*signyy(i))/normsig(i)
-            xpxy(i)  =  lp66*signxy(i)/normsig(i)
+          !< Computation of the xprime and xprimeprime tensors
+          xpxx(i)  = (lp11*signxx(i) + lp12*signyy(i))/normsig(i)
+          xpyy(i)  = (lp21*signxx(i) + lp22*signyy(i))/normsig(i)
+          xpxy(i)  =  lp66*signxy(i)/normsig(i)
 !
-            xppxx(i) = (lpp11*signxx(i) + lpp12*signyy(i))/normsig(i)
-            xppyy(i) = (lpp21*signxx(i) + lpp22*signyy(i))/normsig(i)
-            xppxy(i) =  lpp66*signxy(i)/normsig(i)
+          xppxx(i) = (lpp11*signxx(i) + lpp12*signyy(i))/normsig(i)
+          xppyy(i) = (lpp21*signxx(i) + lpp22*signyy(i))/normsig(i)
+          xppxy(i) =  lpp66*signxy(i)/normsig(i)
 !
-            !< Computation of the xprime and xprimeprime principal stresses
-            mohr_center = (xpxx(i)+xpyy(i))/two
-            mohr_radius = sqrt(((xpxx(i)-xpyy(i))/two)**2 + xpxy(i)**2)
-            mohr_radius = max(em20,mohr_radius)
-            xp1(i) = mohr_center + mohr_radius
-            xp2(i) = mohr_center - mohr_radius
-            !< Derivative of xprime 1 w.r.t xprime tensor
-            dxp1dxpxx = half*(one + (xpxx(i)-xpyy(i))/(two*mohr_radius))
-            dxp1dxpyy = half*(one - (xpxx(i)-xpyy(i))/(two*mohr_radius))
-            dxp1dxpxy = xpxy(i)/mohr_radius
-            !< Derivative of xprime 2 w.r.t xprime tensor
-            dxp2dxpxx = half*(one - (xpxx(i)-xpyy(i))/(two*mohr_radius))
-            dxp2dxpyy = half*(one + (xpxx(i)-xpyy(i))/(two*mohr_radius))
-            dxp2dxpxy = -xpxy(i)/mohr_radius
+          !< Computation of the xprime and xprimeprime principal stresses
+          mohr_center = (xpxx(i)+xpyy(i))/two
+          mohr_radius = sqrt(((xpxx(i)-xpyy(i))/two)**2 + xpxy(i)**2)
+          mohr_radius = max(em20,mohr_radius)
+          xp1(i) = mohr_center + mohr_radius
+          xp2(i) = mohr_center - mohr_radius
+          !< Derivative of xprime 1 w.r.t xprime tensor
+          dxp1dxpxx = half*(one + (xpxx(i)-xpyy(i))/(two*mohr_radius))
+          dxp1dxpyy = half*(one - (xpxx(i)-xpyy(i))/(two*mohr_radius))
+          dxp1dxpxy = xpxy(i)/mohr_radius
+          !< Derivative of xprime 2 w.r.t xprime tensor
+          dxp2dxpxx = half*(one - (xpxx(i)-xpyy(i))/(two*mohr_radius))
+          dxp2dxpyy = half*(one + (xpxx(i)-xpyy(i))/(two*mohr_radius))
+          dxp2dxpxy = -xpxy(i)/mohr_radius
 !
-            !< Computation of xprimeprime principal stresses
-            mohr_center = (xppxx(i)+xppyy(i))/two
-            mohr_radius = sqrt(((xppxx(i)-xppyy(i))/two)**2 + xppxy(i)**2)
-            mohr_radius = max(em20,mohr_radius)
-            xpp1(i) = mohr_center + mohr_radius
-            xpp2(i) = mohr_center - mohr_radius
-            !< Derivative of xprimeprime 1 w.r.t xprimeprime tensor
-            dxpp1dxppxx = half*(one + (xppxx(i)-xppyy(i))/(two*mohr_radius))
-            dxpp1dxppyy = half*(one - (xppxx(i)-xppyy(i))/(two*mohr_radius))
-            dxpp1dxppxy = xppxy(i)/mohr_radius
-            !< Derivative of xprimeprime 2 w.r.t xprimeprime tensor
-            dxpp2dxppxx = half*(one - (xppxx(i)-xppyy(i))/(two*mohr_radius))
-            dxpp2dxppyy = half*(one + (xppxx(i)-xppyy(i))/(two*mohr_radius))
-            dxpp2dxppxy = -xppxy(i)/mohr_radius
+          !< Computation of xprimeprime principal stresses
+          mohr_center = (xppxx(i)+xppyy(i))/two
+          mohr_radius = sqrt(((xppxx(i)-xppyy(i))/two)**2 + xppxy(i)**2)
+          mohr_radius = max(em20,mohr_radius)
+          xpp1(i) = mohr_center + mohr_radius
+          xpp2(i) = mohr_center - mohr_radius
+          !< Derivative of xprimeprime 1 w.r.t xprimeprime tensor
+          dxpp1dxppxx = half*(one + (xppxx(i)-xppyy(i))/(two*mohr_radius))
+          dxpp1dxppyy = half*(one - (xppxx(i)-xppyy(i))/(two*mohr_radius))
+          dxpp1dxppxy = xppxy(i)/mohr_radius
+          !< Derivative of xprimeprime 2 w.r.t xprimeprime tensor
+          dxpp2dxppxx = half*(one - (xppxx(i)-xppyy(i))/(two*mohr_radius))
+          dxpp2dxppyy = half*(one + (xppxx(i)-xppyy(i))/(two*mohr_radius))
+          dxpp2dxppxy = -xppxy(i)/mohr_radius
 !
-            !< Computation of the phiprime and phiprimeprime functions
-            phip(i)  = (abs(xp1(i) - xp2(i)))**expa
-            phipp(i) = (abs(two*xpp2(i) + xpp1(i)))**expa +                    &
-              (abs(two*xpp1(i) + xpp2(i)))**expa
+          !< Computation of the phiprime and phiprimeprime functions
+          phip(i)  = (abs(xp1(i) - xp2(i)))**expa
+          phipp(i) = (abs(two*xpp2(i) + xpp1(i)))**expa +                      &
+            (abs(two*xpp1(i) + xpp2(i)))**expa
 !
-            !< Equivalent stress
-            seq(i) = half*(phip(i)+phipp(i))
-            if (seq(i) > zero) then
-              seq(i) = exp((one/expa)*log(seq(i)))
-            else
-              seq(i) = zero
-            end if
-            seq(i) = seq(i)*normsig(i)
+          !< Equivalent stress
+          seq(i) = half*(phip(i)+phipp(i))
+          if (seq(i) > zero) then
+            seq(i) = exp((one/expa)*log(seq(i)))
+          else
+            seq(i) = zero
+          end if
+          seq(i) = seq(i)*normsig(i)
 !
-            !< Assembling derivative of xprime 1 w.r.t stress tensor
-            dxp1dsigxx = dxp1dxpxx*lp11 + dxp1dxpyy*lp21
-            dxp1dsigyy = dxp1dxpxx*lp12 + dxp1dxpyy*lp22
-            dxp1dsigxy = dxp1dxpxy*lp66
+          !< Assembling derivative of xprime 1 w.r.t stress tensor
+          dxp1dsigxx = dxp1dxpxx*lp11 + dxp1dxpyy*lp21
+          dxp1dsigyy = dxp1dxpxx*lp12 + dxp1dxpyy*lp22
+          dxp1dsigxy = dxp1dxpxy*lp66
 !
-            !< Assembling derivative of xprime 2 w.r.t stress tensor
-            dxp2dsigxx = dxp2dxpxx*lp11 + dxp2dxpyy*lp21
-            dxp2dsigyy = dxp2dxpxx*lp12 + dxp2dxpyy*lp22
-            dxp2dsigxy = dxp2dxpxy*lp66
+          !< Assembling derivative of xprime 2 w.r.t stress tensor
+          dxp2dsigxx = dxp2dxpxx*lp11 + dxp2dxpyy*lp21
+          dxp2dsigyy = dxp2dxpxx*lp12 + dxp2dxpyy*lp22
+          dxp2dsigxy = dxp2dxpxy*lp66
 !
-            !< Assembling derivative of xprimeprime 1 w.r.t stress tensor
-            dxpp1dsigxx = dxpp1dxppxx*lpp11 + dxpp1dxppyy*lpp21
-            dxpp1dsigyy = dxpp1dxppxx*lpp12 + dxpp1dxppyy*lpp22
-            dxpp1dsigxy = dxpp1dxppxy*lpp66
+          !< Assembling derivative of xprimeprime 1 w.r.t stress tensor
+          dxpp1dsigxx = dxpp1dxppxx*lpp11 + dxpp1dxppyy*lpp21
+          dxpp1dsigyy = dxpp1dxppxx*lpp12 + dxpp1dxppyy*lpp22
+          dxpp1dsigxy = dxpp1dxppxy*lpp66
 !
-            !< Assembling derivative of xprimeprime 2 w.r.t stress tensor
-            dxpp2dsigxx = dxpp2dxppxx*lpp11 + dxpp2dxppyy*lpp21
-            dxpp2dsigyy = dxpp2dxppxx*lpp12 + dxpp2dxppyy*lpp22
-            dxpp2dsigxy = dxpp2dxppxy*lpp66
+          !< Assembling derivative of xprimeprime 2 w.r.t stress tensor
+          dxpp2dsigxx = dxpp2dxppxx*lpp11 + dxpp2dxppyy*lpp21
+          dxpp2dsigyy = dxpp2dxppxx*lpp12 + dxpp2dxppyy*lpp22
+          dxpp2dsigxy = dxpp2dxppxy*lpp66
 !
-            !< Derivative of phiprime w.r.t xprime 1
-            dphipdxp1 = expa*(abs(xp1(i)-xp2(i)))**(expa-1)*sign(one,xp1(i)-xp2(i))
-            !< Derivative of phiprime w.r.t xprime 2
-            dphipdxp2 = -dphipdxp1
+          !< Derivative of phiprime w.r.t xprime 1
+          dphipdxp1 = expa*(abs(xp1(i)-xp2(i)))**(expa-1)*sign(one,xp1(i)-xp2(i))
+          !< Derivative of phiprime w.r.t xprime 2
+          dphipdxp2 = -dphipdxp1
 !
-            !< Derivative of phiprimeprime w.r.t xprimeprime 1
-            dphippdxpp1 = expa*(abs(two*xpp2(i)+xpp1(i)))**(expa-1)*           &
-              sign(one,two*xpp2(i)+xpp1(i)) +     &
-              two*expa*(abs(two*xpp1(i)+xpp2(i)))**(expa-1)*                   &
-              sign(one,two*xpp1(i)+xpp2(i))
-            !< Derivative of phiprimeprime w.r.t xprimeprime 2
-            dphippdxpp2 = expa*(abs(two*xpp1(i)+xpp2(i)))**(expa-1)*           &
-              sign(one,two*xpp1(i)+xpp2(i)) +     &
-              two*expa*(abs(two*xpp2(i)+xpp1(i)))**(expa-1)*                   &
-              sign(one,two*xpp2(i)+xpp1(i))
+          !< Derivative of phiprimeprime w.r.t xprimeprime 1
+          dphippdxpp1 = expa*(abs(two*xpp2(i)+xpp1(i)))**(expa-1)*             &
+            sign(one,two*xpp2(i)+xpp1(i)) +                                    &
+            two*expa*(abs(two*xpp1(i)+xpp2(i)))**(expa-1)*                     &
+            sign(one,two*xpp1(i)+xpp2(i))
+          !< Derivative of phiprimeprime w.r.t xprimeprime 2
+          dphippdxpp2 = expa*(abs(two*xpp1(i)+xpp2(i)))**(expa-1)*             &
+            sign(one,two*xpp1(i)+xpp2(i)) +                                    &
+            two*expa*(abs(two*xpp2(i)+xpp1(i)))**(expa-1)*                     &
+            sign(one,two*xpp2(i)+xpp1(i))
 !
-            !< Assembling derivative of phiprime w.r.t stress tensor
-            dphipdsigxx = dphipdxp1*dxp1dsigxx + dphipdxp2*dxp2dsigxx
-            dphipdsigyy = dphipdxp1*dxp1dsigyy + dphipdxp2*dxp2dsigyy
-            dphipdsigxy = dphipdxp1*dxp1dsigxy + dphipdxp2*dxp2dsigxy
+          !< Assembling derivative of phiprime w.r.t stress tensor
+          dphipdsigxx = dphipdxp1*dxp1dsigxx + dphipdxp2*dxp2dsigxx
+          dphipdsigyy = dphipdxp1*dxp1dsigyy + dphipdxp2*dxp2dsigyy
+          dphipdsigxy = dphipdxp1*dxp1dsigxy + dphipdxp2*dxp2dsigxy
 !
-            !< Assembling derivative of phiprimeprime w.r.t stress tensor
-            dphippdsigxx = dphippdxpp1*dxpp1dsigxx + dphippdxpp2*dxpp2dsigxx
-            dphippdsigyy = dphippdxpp1*dxpp1dsigyy + dphippdxpp2*dxpp2dsigyy
-            dphippdsigxy = dphippdxpp1*dxpp1dsigxy + dphippdxpp2*dxpp2dsigxy
+          !< Assembling derivative of phiprimeprime w.r.t stress tensor
+          dphippdsigxx = dphippdxpp1*dxpp1dsigxx + dphippdxpp2*dxpp2dsigxx
+          dphippdsigyy = dphippdxpp1*dxpp1dsigyy + dphippdxpp2*dxpp2dsigyy
+          dphippdsigxy = dphippdxpp1*dxpp1dsigxy + dphippdxpp2*dxpp2dsigxy
 !
-            !< Derivative of equivalent stress w.r.t phiprime
-            dseqdphip  =                                                       &
-              (half/expa)*exp((one/expa - one)*log(half*(phip(i)+phipp(i))))
-            !< Derivative of equivalent stress w.r.t phiprimeprime
-            dseqdphipp = dseqdphip
+          !< Derivative of equivalent stress w.r.t phiprime
+          dseqdphip  =                                                         &
+            (half/expa)*exp((one/expa - one)*log(half*(phip(i)+phipp(i))))
+          !< Derivative of equivalent stress w.r.t phiprimeprime
+          dseqdphipp = dseqdphip
 !
-            !< Assembling derivative of equivalent stress w.r.t stress tensor
-            normxx(i) = dseqdphip*dphipdsigxx + dseqdphipp*dphippdsigxx
-            normyy(i) = dseqdphip*dphipdsigyy + dseqdphipp*dphippdsigyy
-            normzz(i) = - (normxx(i) + normyy(i))
-            normxy(i) = dseqdphip*dphipdsigxy + dseqdphipp*dphippdsigxy
-            normyz(i) = zero
-            normzx(i) = zero
+          !< Assembling derivative of equivalent stress w.r.t stress tensor
+          normxx(i) = dseqdphip*dphipdsigxx + dseqdphipp*dphippdsigxx
+          normyy(i) = dseqdphip*dphipdsigyy + dseqdphipp*dphippdsigyy
+          normzz(i) = - (normxx(i) + normyy(i))
+          normxy(i) = dseqdphip*dphipdsigxy + dseqdphipp*dphippdsigxy
+          normyz(i) = zero
+          normzx(i) = zero
 !
         enddo
 !

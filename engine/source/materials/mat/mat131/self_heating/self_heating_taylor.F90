@@ -23,7 +23,7 @@
       module self_heating_taylor_mod
       contains
       subroutine self_heating_taylor(                                          &
-        matparam ,nel      ,sigy     ,dtemp_dpla,epsd     )
+        matparam ,nel      ,nindx    ,indx     ,sigy     ,dtemp_dpla,epsd     )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -39,13 +39,15 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
         integer,                       intent(in)    :: nel        !< Number of elements in the group
+        integer,                       intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer, dimension(nel),       intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(inout) :: dtemp_dpla !< Derivative of temperature w.r.t. cumulated plastic strain
         real(kind=WP), dimension(nel), intent(in)    :: epsd       !< Equivalent strain rate
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: eta,cp,deis,dead,rho
         real(kind=WP), dimension(nel) :: weight
 !===============================================================================
@@ -61,7 +63,9 @@
         dead = matparam%uparam(offset + 4) !< Strain rates for the end of adiabatic transition
         rho  = matparam%rho0               !< Material initial density
         !< Strain rate weight factor computation
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1, nindx
+          i = indx(ii)
           if (epsd(i) < deis) then
             weight(i) = zero
           elseif (epsd(i) > dead) then

@@ -26,7 +26,7 @@
           matparam ,nel      ,nindx    ,indx     ,iresp    ,eltype   ,         &
           signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
           normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,         &
-          N        ,second_order,seq   )
+          seq      )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -47,8 +47,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam !< Material parameters data
         integer,                       intent(in)    :: nel      !< Number of elements in the group
-        integer,                       intent(in)    :: nindx    !< Number of elements in the group
-        integer, dimension(nel),       intent(in)    :: indx     !< Array of element indices in the group
+        integer,                       intent(in)    :: nindx    !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx     !< Indices of the elements to consider in the computation (for partial updates)
         integer,                       intent(in)    :: iresp    !< Precision flag
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
         real(kind=WP), dimension(nel), intent(in)    :: signyy   !< Current stress yy
@@ -63,8 +63,6 @@
         real(kind=WP), dimension(nel), intent(inout) :: normyz   !< 1st derivative of equivalent stress wrt stress yz
         real(kind=WP), dimension(nel), intent(inout) :: normzx   !< 1st derivative of equivalent stress wrt stress zx
         integer,                       intent(in)    :: eltype   !< Element type
-        real(kind=WP), dimension(nel,6,6), intent(inout) :: N    !< 2nd derivative of equivalent stress
-        logical,                       intent(in)    :: second_order !< Flag for computing second order derivatives
         real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
@@ -84,42 +82,40 @@
             call yield_criterion_vonmises(                                     &
               nel      ,nindx    ,indx     ,seq      ,eltype   ,               &
               signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
-              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
-              N        ,second_order)
+              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
           !---------------------------------------------------------------------
           !< Hershey yield criterion
           !---------------------------------------------------------------------
           case(2)
             call yield_criterion_hershey(                                      &          
-              matparam ,nel      ,seq      ,iresp    ,eltype   ,               &
+              matparam ,nel      ,nindx    ,indx     ,seq      ,iresp    ,     &
               signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
               normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
-              N        ,second_order)  
+              eltype   )  
           !---------------------------------------------------------------------
           !< Hill yield criterion
           !---------------------------------------------------------------------
           case(3)
             call yield_criterion_hill(                                         &          
-              matparam ,nel      ,seq      ,eltype   ,                         &
+              matparam ,nel      ,nindx    ,indx     ,seq      ,eltype   ,     &
               signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,     &
-              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,     &
-              N        ,second_order)
+              normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
           !---------------------------------------------------------------------
           !< Barlat 89 yield criterion
           !---------------------------------------------------------------------
           case(4)
             call yield_criterion_barlat1989(                                   &          
-              matparam ,nel      ,seq      ,signxx   ,signyy   ,signxy   ,     &
+              matparam ,nel      ,nindx    ,indx     ,seq      ,               &
+              signxx   ,signyy   ,signxy   ,                                   &
               normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
-            N(:,:,:) = zero
           !---------------------------------------------------------------------
           !< Barlat 2000 yield criterion
           !---------------------------------------------------------------------
           case(5)
             call yield_criterion_barlat2000(                                   &          
-              matparam ,nel      ,seq      ,signxx   ,signyy   ,signxy   ,     &
+              matparam ,nel      ,nindx    ,indx     ,seq      ,               &
+              signxx   ,signyy   ,signxy   ,                                   &
               normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
-            N(:,:,:) = zero
         end select
 !
       end subroutine elasto_plastic_eq_stress

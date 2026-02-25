@@ -23,7 +23,8 @@
       module therm_softening_johnsoncook_mod
       contains
       subroutine therm_softening_johnsoncook(                                  &
-        matparam ,nel      ,sigy     ,temp     ,dsigy_dpla,dtemp_dpla)
+        matparam ,nel      ,nindx    ,indx     ,sigy     ,temp     ,dsigy_dpla,&
+        dtemp_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -39,6 +40,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
         integer,                       intent(in)    :: nel        !< Number of elements in the group
+        integer,                       intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(inout) :: temp       !< Temperature
         real(kind=WP), dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of yield stress w.r.t. cumulated plastic strain
@@ -46,7 +49,7 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: tref,tmelt,m
         real(kind=WP) :: thermfac,dthermfac
 !===============================================================================
@@ -59,7 +62,9 @@
         tref  = matparam%uparam(offset + 1) !< Reference temperature
         tmelt = matparam%uparam(offset + 2) !< Melting temperature
         m     = matparam%uparam(offset + 3) !< Thermal softening exponent
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1,nindx
+          i = indx(ii)
           temp(i) = min(temp(i),tmelt)
           thermfac = one - ((temp(i)-tref)/(tmelt-tref))**m
           dthermfac = (-m/(tmelt-tref))*((temp(i)-tref)/(tmelt-tref))**(m-1)

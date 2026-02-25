@@ -23,10 +23,9 @@
       module yield_criterion_hill_mod
       contains
       subroutine yield_criterion_hill(                                         &
-          matparam ,nel      ,seq      ,eltype   ,                             &
+          matparam ,nel      ,nindx    ,indx     ,seq      ,eltype   ,         &
           signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
-          normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   ,         &
-          N2       ,second_order)
+          normxx   ,normyy   ,normzz   ,normxy   ,normyz   ,normzx   )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -44,6 +43,8 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam !< Material parameters data
         integer,                       intent(in)    :: nel      !< Number of elements in the group
+        integer,                       intent(in)    :: nindx    !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx     !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: seq      !< Equivalent stress
         integer,                       intent(in)    :: eltype   !< Element type
         real(kind=WP), dimension(nel), intent(in)    :: signxx   !< Current stress xx
@@ -58,12 +59,10 @@
         real(kind=WP), dimension(nel), intent(inout) :: normxy   !< 1st derivative of equivalent stress wrt stress xy
         real(kind=WP), dimension(nel), intent(inout) :: normyz   !< 1st derivative of equivalent stress wrt stress yz
         real(kind=WP), dimension(nel), intent(inout) :: normzx   !< 1st derivative of equivalent stress wrt stress zx
-        real(kind=WP), dimension(nel,6,6), intent(inout) :: N2   !< 2nd derivative of equivalent stress
-        logical,                       intent(in)    :: second_order !< Flag for computing second order derivatives
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: F,G,H,L,M,N
 !===============================================================================
 !
@@ -80,7 +79,9 @@
         N = matparam%uparam(offset + 6)
         !< Solid element
         if (eltype == 1) then
-          do i = 1,nel
+#include "vectorize.inc"
+          do ii = 1,nindx
+            i = indx(ii)
             !< Equivalent stress
             seq(i) = F*(signyy(i)-signzz(i))**2 + G*(signzz(i)-signxx(i))**2 + &
                      H*(signxx(i)-signyy(i))**2 + L*two*(signyz(i))**2       + &
@@ -97,51 +98,11 @@
             normyz(i) = (one/max(seq(i),em20))*L*two*signyz(i)
             normzx(i) = (one/max(seq(i),em20))*M*two*signzx(i)
           enddo
-          !< Second order derivative of eq. stress
-          if (second_order) then 
-            N2(1:nel,1:6,1:6) = zero
-            do i = 1,nel
-              N2(i,1,1) = (one/max(seq(i),em20))*((H+G) - normxx(i)**2) 
-              N2(i,1,2) = (one/max(seq(i),em20))*(- H - normyy(i)*normxx(i)) 
-              N2(i,1,3) = (one/max(seq(i),em20))*(- G - normzz(i)*normxx(i))
-              N2(i,1,4) = (one/max(seq(i),em20))*(    - normxy(i)*normxx(i))
-              N2(i,1,5) = (one/max(seq(i),em20))*(    - normyz(i)*normxx(i))
-              N2(i,1,6) = (one/max(seq(i),em20))*(    - normzx(i)*normxx(i))
-              N2(i,2,1) = N2(i,1,2)
-              N2(i,2,2) = (one/max(seq(i),em20))*((F+H) - normyy(i)**2)
-              N2(i,2,3) = (one/max(seq(i),em20))*(- F - normzz(i)*normyy(i))
-              N2(i,2,4) = (one/max(seq(i),em20))*(    - normxy(i)*normyy(i))
-              N2(i,2,5) = (one/max(seq(i),em20))*(    - normyz(i)*normyy(i))
-              N2(i,2,6) = (one/max(seq(i),em20))*(    - normzx(i)*normyy(i))
-              N2(i,3,1) = N2(i,1,3)
-              N2(i,3,2) = N2(i,2,3)
-              N2(i,3,3) = (one/max(seq(i),em20))*((G+F) - normzz(i)**2)
-              N2(i,3,4) = (one/max(seq(i),em20))*(   - normxy(i)*normzz(i))
-              N2(i,3,5) = (one/max(seq(i),em20))*(   - normyz(i)*normzz(i))
-              N2(i,3,6) = (one/max(seq(i),em20))*(   - normzx(i)*normzz(i))
-              N2(i,4,1) = N2(i,1,4)
-              N2(i,4,2) = N2(i,2,4)
-              N2(i,4,3) = N2(i,3,4)
-              N2(i,4,4) = (one/max(seq(i),em20))*(N*two - normxy(i)**2)
-              N2(i,4,5) = (one/max(seq(i),em20))*(   - normyz(i)*normxy(i))
-              N2(i,4,6) = (one/max(seq(i),em20))*(   - normzx(i)*normxy(i))
-              N2(i,5,1) = N2(i,1,5)
-              N2(i,5,2) = N2(i,2,5)
-              N2(i,5,3) = N2(i,3,5)
-              N2(i,5,4) = N2(i,4,5)
-              N2(i,5,5) = (one/max(seq(i),em20))*(L*two - normyz(i)**2)
-              N2(i,5,6) = (one/max(seq(i),em20))*(   - normzx(i)*normyz(i))
-              N2(i,6,1) = N2(i,1,6)
-              N2(i,6,2) = N2(i,2,6)
-              N2(i,6,3) = N2(i,3,6)
-              N2(i,6,4) = N2(i,4,6)
-              N2(i,6,5) = N2(i,5,6)
-              N2(i,6,6) = (one/max(seq(i),em20))*(N*two - normzx(i)**2)         
-            enddo  
-          endif 
         !< Shell element
         elseif (eltype == 2) then
-          do i = 1,nel
+#include "vectorize.inc"
+          do ii = 1,nindx
+            i = indx(ii)
             !< Equivalent stress
             seq(i) = F*(signyy(i))**2 + G*(signxx(i))**2 +                     &
                               H*(signxx(i)-signyy(i))**2 + N*two*(signxy(i))**2
@@ -154,20 +115,6 @@
             normzz(i) = - normxx(i) - normyy(i)
             normxy(i) = (one/max(seq(i),em20))*N*two*signxy(i)           
           enddo
-          if (second_order) then 
-            N2(1:nel,1:6,1:6) = zero
-            do i = 1,nel
-              N2(i,1,1) = (one/max(seq(i),em20))*((H+G) - normxx(i)**2) 
-              N2(i,1,2) = (one/max(seq(i),em20))*(- H - normyy(i)*normxx(i)) 
-              N2(i,1,4) = (one/max(seq(i),em20))*(    - normxy(i)*normxx(i))
-              N2(i,2,1) = N2(i,1,2)
-              N2(i,2,2) = (one/max(seq(i),em20))*((F+H) - normyy(i)**2)
-              N2(i,2,4) = (one/max(seq(i),em20))*(    - normxy(i)*normyy(i))
-              N2(i,4,1) = N2(i,1,4)
-              N2(i,4,2) = N2(i,2,4)
-              N2(i,4,4) = (one/max(seq(i),em20))*(N*two - normxy(i)**2)
-            enddo  
-          endif 
         endif
 !
       end subroutine yield_criterion_hill

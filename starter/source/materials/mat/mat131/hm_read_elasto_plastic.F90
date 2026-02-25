@@ -169,7 +169,7 @@
           !< Density
           call hm_get_floatv('MAT_RHO'  ,rho0   ,is_available, lsubmodel, unitab)
           call hm_get_intv  ('MAT_IRES' ,ires   ,is_available, lsubmodel)
-          if (ires == 0) ires = 2
+          if (ires == 0) ires = 1
 !
           !< Material header printing
           write(iout,1000) trim(titr),mat_id,ilaw

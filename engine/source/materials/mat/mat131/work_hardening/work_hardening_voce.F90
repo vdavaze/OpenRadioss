@@ -23,7 +23,7 @@
       module work_hardening_voce_mod
       contains
       subroutine work_hardening_voce(                                          &
-        matparam ,nel      ,sigy     ,pla      ,dsigy_dpla)
+        matparam ,nel      ,nindx    ,indx     ,sigy     ,pla      ,dsigy_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -39,13 +39,15 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
         integer,                       intent(in)    :: nel        !< Number of elements in the group
+        integer,                       intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(inout) :: pla        !< Cumulated plastic strain
         real(kind=WP), dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: r0,q1,b1,q2,b2,q3,b3
 !===============================================================================
 !
@@ -61,7 +63,9 @@
         b2 = matparam%uparam(offset + 5) !< Voce 2 saturation rate
         q3 = matparam%uparam(offset + 6) !< Voce 3 saturation stress
         b3 = matparam%uparam(offset + 7) !< Voce 3 saturation rate
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1,nindx
+          i = indx(ii)
           sigy(i) = r0 + q1*(one - exp(-b1*pla(i)))                            &
                        + q2*(one - exp(-b2*pla(i)))                            &
                        + q3*(one - exp(-b3*pla(i)))

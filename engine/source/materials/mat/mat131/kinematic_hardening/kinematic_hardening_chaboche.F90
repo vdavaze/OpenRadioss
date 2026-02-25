@@ -23,14 +23,14 @@
       module kinematic_hardening_chaboche_mod
       contains
       subroutine kinematic_hardening_chaboche(                                 &
-        matparam ,nel      ,l_sigb   ,dsigb_dlam,sigb      ,chard    ,         &
+        matparam ,nel      ,nindx    ,indx      ,l_sigb   ,dsigb_dlam,         &
         normxx   ,normyy   ,normzz   ,normxy    ,normyz    ,normzx   ,         &
-        dpla_dlam)
+        chard    ,sigb     ,dpla_dlam)
+
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
         use matparam_def_mod
-        use constant_mod
         use precision_mod, only : WP
 !----------------------------------------------------------------
 !   I m p l i c i t   T y p e s
@@ -41,21 +41,23 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam     !< Material parameters data
         integer,                       intent(in)    :: nel          !< Number of elements in the group
+        integer,                       intent(in)    :: nindx        !< Number of elements to consider in the computation (for partial updates)
+        integer,       dimension(nel), intent(in)    :: indx         !< Indices of the elements to consider in the computation (for partial updates)
         integer,                       intent(in)    :: l_sigb       !< Number of backstress components
         real(kind=WP), dimension(nel,l_sigb),intent(inout) :: dsigb_dlam !< Backstress components derivative w.r.t plastic multiplier
-        real(kind=WP),                 intent(in)    :: chard        !< Mixed hardening parameter
-        real(kind=WP), dimension(nel,l_sigb),intent(in) :: sigb      !< Backstress components for kinematic hardening
         real(kind=WP), dimension(nel), intent(in)    :: normxx       !< 1st derivative of equivalent stress wrt stress xx
         real(kind=WP), dimension(nel), intent(in)    :: normyy       !< 1st derivative of equivalent stress wrt stress yy
         real(kind=WP), dimension(nel), intent(in)    :: normzz       !< 1st derivative of equivalent stress wrt stress zz
         real(kind=WP), dimension(nel), intent(in)    :: normxy       !< 1st derivative of equivalent stress wrt stress xy
         real(kind=WP), dimension(nel), intent(in)    :: normyz       !< 1st derivative of equivalent stress wrt stress yz
         real(kind=WP), dimension(nel), intent(in)    :: normzx       !< 1st derivative of equivalent stress wrt stress zx
-        real(kind=WP),                 intent(in)    :: dpla_dlam    !< Derivative of equivalent plastic strain w.r.t plastic multiplier
+        real(kind=WP),                 intent(in)    :: chard        !< Mixed hardening parameter
+        real(kind=WP), dimension(nel,l_sigb),intent(in) :: sigb      !< Backstress components for kinematic hardening
+        real(kind=WP), dimension(nel), intent(in)    :: dpla_dlam    !< Derivative of equivalent plastic strain w.r.t plastic multiplier
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,offset
+        integer :: i,ii,offset
         real(kind=WP) :: akh(4),ckh(4)
 !===============================================================================
 !
@@ -73,35 +75,37 @@
         ckh(4) = matparam%uparam(offset + 7) !< 
         akh(4) = matparam%uparam(offset + 8) !<
         !< Compute the backstress components derivative w.r.t plastic multiplier
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1,nindx
+          i = indx(ii)
           !< 1st Chaboche-Rousselier back stress
-          dsigb_dlam(i, 1) = chard*(akh(1)*ckh(1)*normxx(i) - ckh(1)*sigb(i,1)*dpla_dlam)
-          dsigb_dlam(i, 2) = chard*(akh(1)*ckh(1)*normyy(i) - ckh(1)*sigb(i,2)*dpla_dlam)
-          dsigb_dlam(i, 3) = chard*(akh(1)*ckh(1)*normzz(i) - ckh(1)*sigb(i,3)*dpla_dlam)
-          dsigb_dlam(i, 4) = chard*(akh(1)*ckh(1)*normxy(i) - ckh(1)*sigb(i,4)*dpla_dlam)
-          dsigb_dlam(i, 5) = chard*(akh(1)*ckh(1)*normyz(i) - ckh(1)*sigb(i,5)*dpla_dlam)
-          dsigb_dlam(i, 6) = chard*(akh(1)*ckh(1)*normzx(i) - ckh(1)*sigb(i,6)*dpla_dlam)
+          dsigb_dlam(i, 1) = chard*(akh(1)*ckh(1)*normxx(i) - ckh(1)*sigb(i,1)*dpla_dlam(i))
+          dsigb_dlam(i, 2) = chard*(akh(1)*ckh(1)*normyy(i) - ckh(1)*sigb(i,2)*dpla_dlam(i))
+          dsigb_dlam(i, 3) = chard*(akh(1)*ckh(1)*normzz(i) - ckh(1)*sigb(i,3)*dpla_dlam(i))
+          dsigb_dlam(i, 4) = chard*(akh(1)*ckh(1)*normxy(i) - ckh(1)*sigb(i,4)*dpla_dlam(i))
+          dsigb_dlam(i, 5) = chard*(akh(1)*ckh(1)*normyz(i) - ckh(1)*sigb(i,5)*dpla_dlam(i))
+          dsigb_dlam(i, 6) = chard*(akh(1)*ckh(1)*normzx(i) - ckh(1)*sigb(i,6)*dpla_dlam(i))
           !< 2nd Chaboche-Rousselier back stress
-          dsigb_dlam(i, 7) = chard*(akh(2)*ckh(2)*normxx(i) - ckh(2)*sigb(i, 7)*dpla_dlam)
-          dsigb_dlam(i, 8) = chard*(akh(2)*ckh(2)*normyy(i) - ckh(2)*sigb(i, 8)*dpla_dlam)
-          dsigb_dlam(i, 9) = chard*(akh(2)*ckh(2)*normzz(i) - ckh(2)*sigb(i, 9)*dpla_dlam)
-          dsigb_dlam(i,10) = chard*(akh(2)*ckh(2)*normxy(i) - ckh(2)*sigb(i,10)*dpla_dlam)
-          dsigb_dlam(i,11) = chard*(akh(2)*ckh(2)*normyz(i) - ckh(2)*sigb(i,11)*dpla_dlam)
-          dsigb_dlam(i,12) = chard*(akh(2)*ckh(2)*normzx(i) - ckh(2)*sigb(i,12)*dpla_dlam)
+          dsigb_dlam(i, 7) = chard*(akh(2)*ckh(2)*normxx(i) - ckh(2)*sigb(i, 7)*dpla_dlam(i))
+          dsigb_dlam(i, 8) = chard*(akh(2)*ckh(2)*normyy(i) - ckh(2)*sigb(i, 8)*dpla_dlam(i))
+          dsigb_dlam(i, 9) = chard*(akh(2)*ckh(2)*normzz(i) - ckh(2)*sigb(i, 9)*dpla_dlam(i))
+          dsigb_dlam(i,10) = chard*(akh(2)*ckh(2)*normxy(i) - ckh(2)*sigb(i,10)*dpla_dlam(i))
+          dsigb_dlam(i,11) = chard*(akh(2)*ckh(2)*normyz(i) - ckh(2)*sigb(i,11)*dpla_dlam(i))
+          dsigb_dlam(i,12) = chard*(akh(2)*ckh(2)*normzx(i) - ckh(2)*sigb(i,12)*dpla_dlam(i))
           !< 3rd Chaboche-Rousselier back stress
-          dsigb_dlam(i,13) = chard*(akh(3)*ckh(3)*normxx(i) - ckh(3)*sigb(i,13)*dpla_dlam)
-          dsigb_dlam(i,14) = chard*(akh(3)*ckh(3)*normyy(i) - ckh(3)*sigb(i,14)*dpla_dlam)
-          dsigb_dlam(i,15) = chard*(akh(3)*ckh(3)*normzz(i) - ckh(3)*sigb(i,15)*dpla_dlam)
-          dsigb_dlam(i,16) = chard*(akh(3)*ckh(3)*normxy(i) - ckh(3)*sigb(i,16)*dpla_dlam)
-          dsigb_dlam(i,17) = chard*(akh(3)*ckh(3)*normyz(i) - ckh(3)*sigb(i,17)*dpla_dlam)
-          dsigb_dlam(i,18) = chard*(akh(3)*ckh(3)*normzx(i) - ckh(3)*sigb(i,18)*dpla_dlam)  
+          dsigb_dlam(i,13) = chard*(akh(3)*ckh(3)*normxx(i) - ckh(3)*sigb(i,13)*dpla_dlam(i))
+          dsigb_dlam(i,14) = chard*(akh(3)*ckh(3)*normyy(i) - ckh(3)*sigb(i,14)*dpla_dlam(i))
+          dsigb_dlam(i,15) = chard*(akh(3)*ckh(3)*normzz(i) - ckh(3)*sigb(i,15)*dpla_dlam(i))
+          dsigb_dlam(i,16) = chard*(akh(3)*ckh(3)*normxy(i) - ckh(3)*sigb(i,16)*dpla_dlam(i))
+          dsigb_dlam(i,17) = chard*(akh(3)*ckh(3)*normyz(i) - ckh(3)*sigb(i,17)*dpla_dlam(i))
+          dsigb_dlam(i,18) = chard*(akh(3)*ckh(3)*normzx(i) - ckh(3)*sigb(i,18)*dpla_dlam(i))  
           !< 4th Chaboche-Rousselier back stress
-          dsigb_dlam(i,19) = chard*(akh(4)*ckh(4)*normxx(i) - ckh(4)*sigb(i,19)*dpla_dlam)
-          dsigb_dlam(i,20) = chard*(akh(4)*ckh(4)*normyy(i) - ckh(4)*sigb(i,20)*dpla_dlam)
-          dsigb_dlam(i,21) = chard*(akh(4)*ckh(4)*normzz(i) - ckh(4)*sigb(i,21)*dpla_dlam)
-          dsigb_dlam(i,22) = chard*(akh(4)*ckh(4)*normxy(i) - ckh(4)*sigb(i,22)*dpla_dlam)
-          dsigb_dlam(i,23) = chard*(akh(4)*ckh(4)*normyz(i) - ckh(4)*sigb(i,23)*dpla_dlam)
-          dsigb_dlam(i,24) = chard*(akh(4)*ckh(4)*normzx(i) - ckh(4)*sigb(i,24)*dpla_dlam)
+          dsigb_dlam(i,19) = chard*(akh(4)*ckh(4)*normxx(i) - ckh(4)*sigb(i,19)*dpla_dlam(i))
+          dsigb_dlam(i,20) = chard*(akh(4)*ckh(4)*normyy(i) - ckh(4)*sigb(i,20)*dpla_dlam(i))
+          dsigb_dlam(i,21) = chard*(akh(4)*ckh(4)*normzz(i) - ckh(4)*sigb(i,21)*dpla_dlam(i))
+          dsigb_dlam(i,22) = chard*(akh(4)*ckh(4)*normxy(i) - ckh(4)*sigb(i,22)*dpla_dlam(i))
+          dsigb_dlam(i,23) = chard*(akh(4)*ckh(4)*normyz(i) - ckh(4)*sigb(i,23)*dpla_dlam(i))
+          dsigb_dlam(i,24) = chard*(akh(4)*ckh(4)*normzx(i) - ckh(4)*sigb(i,24)*dpla_dlam(i))
         enddo
 !
       end subroutine kinematic_hardening_chaboche

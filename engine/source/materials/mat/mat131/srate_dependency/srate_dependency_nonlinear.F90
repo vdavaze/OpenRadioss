@@ -23,7 +23,7 @@
       module srate_dependency_nonlinear_mod
       contains
       subroutine srate_dependency_nonlinear(                                   &
-        matparam ,nel      ,sigy     ,epsd     ,dsigy_dpla)
+        matparam ,nel      ,nindx    ,indx     ,sigy     ,epsd     ,dsigy_dpla)
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -39,13 +39,15 @@
 !----------------------------------------------------------------
         type(matparam_struct_),        intent(in)    :: matparam   !< Material parameters data
         integer,                       intent(in)    :: nel        !< Number of elements in the group
+        integer,                       intent(in)    :: nindx      !< Number of elements to consider in the computation (for partial updates)
+        integer, dimension(nel),       intent(in)    :: indx       !< Indices of the elements to consider in the computation (for partial updates)
         real(kind=WP), dimension(nel), intent(inout) :: sigy       !< Equivalent stress
         real(kind=WP), dimension(nel), intent(in)    :: epsd       !< Strain rate
         real(kind=WP), dimension(nel), intent(inout) :: dsigy_dpla !< Derivative of eq. stress w.r.t. cumulated plastic strain
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: offset,i
+        integer :: offset,i,ii
         real(kind=WP) :: cs,dps,ratefac,dratefac
 !===============================================================================
 !
@@ -57,7 +59,9 @@
         cs  = matparam%uparam(offset + 1) !< Non-linear strain rate dependency exponent
         dps = matparam%uparam(offset + 2) !< Reference strain rate
         !< Scaled yield stress formulation
-        do i = 1,nel
+#include "vectorize.inc"
+        do ii = 1, nindx
+          i = indx(ii)
           ratefac = exp(cs*log(one + (epsd(i)/dps)))
           sigy(i) = sigy(i)*ratefac
           dsigy_dpla(i) = dsigy_dpla(i)*ratefac
