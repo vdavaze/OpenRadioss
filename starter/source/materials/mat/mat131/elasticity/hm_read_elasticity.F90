@@ -37,6 +37,7 @@
           use precision_mod, only : WP
           use hm_read_elasticity_isotropic_mod
           use hm_read_elasticity_orthotropic_mod
+          use hm_read_elasticity_anisotropic_mod
 !----------------------------------------------------------------
 !   I m p l i c i t   T y p e s
 !----------------------------------------------------------------
@@ -76,6 +77,14 @@
                 ikey     ,ielas    ,nupar_elas,upar_elas,is_available,         &
                 unitab   ,lsubmodel,matparam  ,parmat   ,iout        ,         &
                 is_encrypted)
+            !===================================================================
+            !< Anisotropic elasticity parameters
+            !===================================================================
+            case ('ANIS')
+              call hm_read_elasticity_anisotropic(                             &
+                ikey     ,ielas    ,nupar_elas,upar_elas,is_available,         &
+                unitab   ,lsubmodel,matparam  ,parmat   ,iout        ,         &
+                is_encrypted)    
           end select
 ! -------------------------------------------------------------------------------
         end subroutine hm_read_elasticity

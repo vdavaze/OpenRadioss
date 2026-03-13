@@ -105,8 +105,8 @@
           dsigbxx_dlam,dsigbyy_dlam,dsigbzz_dlam,dsigbxy_dlam,                 &
           dsigbyz_dlam,dsigbzx_dlam,chard,dphi
         real(kind=WP), dimension(nel) :: pla0,normxx,normyy,normzz,            &
-          normxy,normyz,normzx,phi,young,dsigy_dpla,dtemp_dpla,s13,s23,shf,    &
-          sigbxx,sigbyy,sigbzz,sigbxy,sigbyz,sigbzx,sigy0,dsigy0_dpla,         &
+          normxy,normyz,normzx,phi,young,dsigy_dpla,dtemp_dpla,s13,s23,s43,    &
+          shf,sigbxx,sigbyy,sigbzz,sigbxy,sigbyz,sigbzx,sigy0,dsigy0_dpla,     &
           dtemp0_dpla,zeros,dsigxx,dsigyy,dsigzz,dsigxy,dsigyz,dsigzx,phi0,    &
           sig0xx,sig0yy,sig0zz,sig0xy,sig0yz,sig0zx,seq0,norm0xx,norm0yy,      &
           norm0zz,norm0xy,norm0yz,norm0zx
@@ -177,7 +177,7 @@
           depsxx   ,depsyy   ,depszz   ,depsxy   ,depsyz   ,depszx   ,         &
           sigoxx   ,sigoyy   ,sigozz   ,sigoxy   ,sigoyz   ,sigozx   ,         &
           signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
-          eltype   ,shf      ,s13      ,s23      )
+          eltype   ,shf      ,s13      ,s23      ,s43      )
 !
         !=======================================================================
         !< - Computation of the initial yield stress
@@ -284,14 +284,23 @@
             !<  a) Derivatives of stress tensor w.r.t lambda
             !<  ----------------------------------------------------------------
             dsigxx_dlam = -(cstf(i,1,1)*norm0xx(i) + cstf(i,1,2)*norm0yy(i) +  &
-                            cstf(i,1,3)*norm0zz(i))
-            dsigyy_dlam = -(cstf(i,1,2)*norm0xx(i) + cstf(i,2,2)*norm0yy(i) +  &
-                            cstf(i,2,3)*norm0zz(i))
-            dsigzz_dlam = -(cstf(i,1,3)*norm0xx(i) + cstf(i,2,3)*norm0yy(i) +  &
-                            cstf(i,3,3)*norm0zz(i))
-            dsigxy_dlam = -(cstf(i,4,4)*norm0xy(i))
-            dsigyz_dlam = -(cstf(i,5,5)*norm0yz(i))
-            dsigzx_dlam = -(cstf(i,6,6)*norm0zx(i))
+                            cstf(i,1,3)*norm0zz(i) + cstf(i,1,4)*norm0xy(i) +  &
+                            cstf(i,1,5)*norm0yz(i) + cstf(i,1,6)*norm0zx(i))
+            dsigyy_dlam = -(cstf(i,2,1)*norm0xx(i) + cstf(i,2,2)*norm0yy(i) +  &
+                            cstf(i,2,3)*norm0zz(i) + cstf(i,2,4)*norm0xy(i) +  &
+                            cstf(i,2,5)*norm0yz(i) + cstf(i,2,6)*norm0zx(i))
+            dsigzz_dlam = -(cstf(i,3,1)*norm0xx(i) + cstf(i,3,2)*norm0yy(i) +  &
+                            cstf(i,3,3)*norm0zz(i) + cstf(i,3,4)*norm0xy(i) +  &
+                            cstf(i,3,5)*norm0yz(i) + cstf(i,3,6)*norm0zx(i))
+            dsigxy_dlam = -(cstf(i,4,1)*norm0xx(i) + cstf(i,4,2)*norm0yy(i) +  &
+                            cstf(i,4,3)*norm0zz(i) + cstf(i,4,4)*norm0xy(i) +  &
+                            cstf(i,4,5)*norm0yz(i) + cstf(i,4,6)*norm0zx(i))
+            dsigyz_dlam = -(cstf(i,5,1)*norm0xx(i) + cstf(i,5,2)*norm0yy(i) +  &
+                            cstf(i,5,3)*norm0zz(i) + cstf(i,5,4)*norm0xy(i) +  &
+                            cstf(i,5,5)*norm0yz(i) + cstf(i,5,6)*norm0zx(i))
+            dsigzx_dlam = -(cstf(i,6,1)*norm0xx(i) + cstf(i,6,2)*norm0yy(i) +  &
+                            cstf(i,6,3)*norm0zz(i) + cstf(i,6,4)*norm0xy(i) +  &
+                            cstf(i,6,5)*norm0yz(i) + cstf(i,6,6)*norm0zx(i))
 !
             !<  b) Assembling derivative of eq. stress sigeq w.r.t lambda
             !<  ----------------------------------------------------------------
@@ -491,7 +500,6 @@
           signyz(1:nel) = signyz(1:nel) + sigbyz(1:nel)
           signzx(1:nel) = signzx(1:nel) + sigbzx(1:nel)
         endif
-!
 !        
         !=======================================================================
         !< - Save remaining error after return mapping

@@ -99,7 +99,7 @@
           dsigbxx_dlam,dsigbyy_dlam,dsigbzz_dlam,dsigbxy_dlam,chard,dphi,      &
           dlam_nl
         real(kind=WP), dimension(nel) :: pla0,normxx,normyy,normzz,normxy,     &
-          normyz,normzx,phi,young,dsigy_dpla,dtemp_dpla,s13,s23,depzz,         &
+          normyz,normzx,phi,young,dsigy_dpla,dtemp_dpla,s13,s23,s43,depzz,     &
           sigbxx,sigbyy,sigbzz,sigbxy,sigy0,dsigy0_dpla,dtemp0_dpla,zeros,     &
           dsigxx,dsigyy,dsigxy,phi0,seq0,norm0xx,norm0yy,norm0zz,norm0xy,      &
           sig0xx,sig0yy,sig0xy
@@ -172,7 +172,7 @@
           depsxx   ,depsyy   ,depszz   ,depsxy   ,depsyz   ,depszx   ,         &
           sigoxx   ,sigoyy   ,sigozz   ,sigoxy   ,sigoyz   ,sigozx   ,         &
           signxx   ,signyy   ,signzz   ,signxy   ,signyz   ,signzx   ,         &
-          eltype   ,shf      ,s13      ,s23      )
+          eltype   ,shf      ,s13      ,s23      ,s43      )
 !
         !=======================================================================
         !< - Computation of the initial yield stress
@@ -268,9 +268,12 @@
 !
             !<  a) Derivatives of stress tensor w.r.t lambda
             !<  ----------------------------------------------------------------
-            dsigxx_dlam = -(cstf(i,1,1)*norm0xx(i) + cstf(i,1,2)*norm0yy(i))
-            dsigyy_dlam = -(cstf(i,1,2)*norm0xx(i) + cstf(i,2,2)*norm0yy(i))
-            dsigxy_dlam = -(cstf(i,4,4)*norm0xy(i))
+            dsigxx_dlam = -(cstf(i,1,1)*norm0xx(i) + cstf(i,1,2)*norm0yy(i) +  &
+                            cstf(i,1,4)*norm0xy(i))
+            dsigyy_dlam = -(cstf(i,2,1)*norm0xx(i) + cstf(i,2,2)*norm0yy(i) +  &
+                            cstf(i,2,4)*norm0xy(i))
+            dsigxy_dlam = -(cstf(i,4,1)*norm0xx(i) + cstf(i,4,2)*norm0yy(i) +  &
+                            cstf(i,4,4)*norm0xy(i))
 !
             !<  b) Assembling derivative of eq. stress sigeq w.r.t lambda
             !<  ----------------------------------------------------------------
@@ -458,6 +461,7 @@
         if (inloc == 0) then 
           dezz(1:nel) = s13(1:nel)*(signxx(1:nel) - sigoxx(1:nel)) +           &
                         s23(1:nel)*(signyy(1:nel) - sigoyy(1:nel)) +           &
+                        s43(1:nel)*(signxy(1:nel) - sigoxy(1:nel)) +           &
                         depzz(1:nel)
           thk(1:nel)  = thk(1:nel) + dezz(1:nel)*thkly(1:nel)*off(1:nel) 
         else
@@ -474,10 +478,15 @@
               endif
               !< Update the thickness variation
               dezz(i) = s13(i)*(cstf(i,1,1)*(depsxx(i) - dlam_nl*normxx(i))  + &
-                                cstf(i,1,2)*(depsyy(i) - dlam_nl*normyy(i))) + &
+                                cstf(i,1,2)*(depsyy(i) - dlam_nl*normyy(i))  + &
+                                cstf(i,1,4)*(depsxy(i) - dlam_nl*normxy(i))) + &
                         s23(i)*(cstf(i,2,1)*(depsxx(i) - dlam_nl*normxx(i))  + &
-                                cstf(i,2,2)*(depsyy(i) - dlam_nl*normyy(i)))   &
-                        + dlam_nl*normzz(i)
+                                cstf(i,2,2)*(depsyy(i) - dlam_nl*normyy(i))  + &
+                                cstf(i,2,4)*(depsxy(i) - dlam_nl*normxy(i))) + &
+                        s43(i)*(cstf(i,4,1)*(depsxx(i) - dlam_nl*normxx(i))  + &
+                                cstf(i,4,2)*(depsyy(i) - dlam_nl*normyy(i))  + &
+                                cstf(i,4,4)*(depsxy(i) - dlam_nl*normxy(i))) + &
+                        dlam_nl*normzz(i)
               thk(i)  = thk(i) + dezz(i)*thkly(i)*off(i)
             endif
           enddo
