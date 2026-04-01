@@ -62,6 +62,7 @@ C-----------------------------------------------
       use mat_elem_mod
       use damping_range_shell_mod
       use damping_range_shell_mom_mod
+      USE SIGEPS136G_MOD
 C-----------------------------------------------
 C   I m p l i c i t   T y p e s
 C-----------------------------------------------
@@ -146,6 +147,7 @@ C     for user material laws : pid(i)=pid(1)
         NVARTMP= ELBUF_STR%BUFLY(1)%NVARTMP
         VARTMP=>ELBUF_STR%BUFLY(1)%MAT(IR,IS,1)%VARTMP
       ENDIF
+      MATPARAM => MAT_ELEM%MAT_PARAM(IMAT)
       IOFF_DUCT(1:MVSIZ) = 0
       VISCMX(1:MVSIZ) = ZERO
 C
@@ -433,6 +435,16 @@ C-------------------------------------------
      A     SSP    ,VISCMX ,THKN    ,LBUF%PLA,UVAR   ,
      B     OFF    ,NGL    ,IPM     ,MAT     ,ETSE   ,
      C     GS     ,SIGY   ,EPSPL   ,ISRATE  ,IPLA)
+      ELSEIF (MTN == 136) THEN 
+        CALL SIGEPS136G(
+     1     JLT    ,MATPARAM,RHO    ,LBUF%DMG,
+     3     DEPSXX ,DEPSYY ,DEPSXY  ,DEPSYZ  ,DEPSZX ,
+     4     DEPBXX ,DEPBYY ,DEPBXY  ,
+     5     SIGOXX ,SIGOYY ,SIGOXY  ,SIGOYZ  ,SIGOZX ,
+     6     MOMOXX ,MOMOYY ,MOMOXY  ,
+     7     SIGNXX ,SIGNYY ,SIGNXY  ,SIGNYZ  ,SIGNZX ,
+     8     MOMNXX ,MOMNYY ,MOMNXY  ,
+     9     SSP    ,ETSE   ,GS      )
       ENDIF ! IF (MTN == 1) THEN
 C-----------------------
 C     DAMPING

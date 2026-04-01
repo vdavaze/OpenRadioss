@@ -248,6 +248,7 @@
           use hm_read_mat133_mod , only : hm_read_mat133
           use hm_read_mat134_mod
           use hm_read_mat135_mod
+          use hm_read_mat136_mod
           use hm_read_mat163_mod
           use hm_read_mat169_arup_mod
           use names_and_titles_mod ,only : nchartitle, ncharline
@@ -1280,6 +1281,13 @@
                call hm_read_mat135(matparam ,                      &
                 mtag     ,nuvar    ,                              &
                 iout     ,unitab   ,lsubmodel, mat_id)
+!-------
+             case ('LAW136','GLOBAL_REINFORCED_CONCRETE')
+              ilaw  = 136
+              call hm_read_mat136(&
+              &matparam ,nuvar    ,nfunc    ,parmat  ,unitab   ,&
+              &mat_id   ,titr     ,mtag     ,nvartmp ,lsubmodel,&
+              &ntable   ,table    ,iout     )
 !-------
              case ('LAW151','MULTIFLUID')
               ilaw  = 151
