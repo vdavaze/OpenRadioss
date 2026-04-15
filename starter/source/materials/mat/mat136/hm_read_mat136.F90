@@ -81,6 +81,8 @@
           call hm_get_floatv('MAT_E'            ,e      ,is_available, lsubmodel, unitab)
           call hm_get_floatv('MAT_NU'           ,nu     ,is_available, lsubmodel, unitab)
           call hm_get_floatv('MAT_H'            ,hthick ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_FT'           ,f_t    ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_FC'           ,f_c    ,is_available, lsubmodel, unitab)
           !----------------------------------------------------------------------------------
 !
           !----------------------------------------------------------------------------------
@@ -102,6 +104,12 @@
           bulk  = e/(three*(one - two*nu))
           !< Transverse shear coefficient
           tshear = hthick*e/(two*(one + nu))
+!
+          !----------------------------------------------------------------------------------
+          !< Damage constants
+          !----------------------------------------------------------------------------------
+          kfiss1 = six*f_t/(e*hthick*hthick)
+          kfiss2 = six*f_c/(e*hthick*hthick)   
 !
           !----------------------------------------------------------------------------------
           !< Filling buffer tables
