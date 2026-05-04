@@ -48,7 +48,7 @@
           integer,                       intent(in)    :: nel      !< Number of elements in the group
           type(matparam_struct_),        intent(in)    :: matparam !< Material parameters data
           real(kind=WP), dimension(nel), intent(in)    :: rho      !< Density at current time
-          real(kind=WP), dimension(nel,2),intent(in)   :: dmg      !< Bending damage at current time
+          real(kind=WP), dimension(nel,2),intent(inout):: dmg      !< Bending damage at current time
           real(kind=WP), dimension(nel), intent(in)    :: depsxx   !< Membrane strain increment xx
           real(kind=WP), dimension(nel), intent(in)    :: depsyy   !< Membrane strain increment yy
           real(kind=WP), dimension(nel), intent(in)    :: depsxy   !< Membrane strain increment xy
@@ -83,6 +83,7 @@
           real(kind=WP) :: young,nu,lambda_m, mu_m, lambda_b, mu_b, mu_tsh
           real(kind=WP) :: k0_1, k0_2, dmax1, dmax2
           real(kind=WP) :: tr_kb, phi_b, Y1, Y2, d1_trial, d2_trial
+          real(kind=WP), dimension(nel) :: xi_tr, xi_xy
 !
           !=====================================================================
           !< - Initialisation of computation on time step

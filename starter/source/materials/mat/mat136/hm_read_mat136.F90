@@ -62,7 +62,7 @@
 !   L o c a l   V a r i a b l e s
 !-----------------------------------------------
           real(kind=WP) :: e, nu, rho0, bulk, shear, hthick, lambda_m, mu_m,   &
-            lambda_b, mu_b, tshear
+            lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2
           integer :: ilaw
           logical :: is_available,is_encrypted
 !-----------------------------------------------
