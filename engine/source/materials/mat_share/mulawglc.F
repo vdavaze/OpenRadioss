@@ -140,7 +140,7 @@ C
 C     for user material laws : pid(i)=pid(1)
       IGTYP = IGEO(11,PID(1))
       IMAT  = ELBUF_STR%BUFLY(1)%IMAT
-      IF (MTN==43.OR.MTN==56.OR.MTN==60.OR.MTN==86) THEN
+      IF (MTN==43.OR.MTN==56.OR.MTN==60.OR.MTN==86.OR.MTN==136) THEN
         NUVAR  = ELBUF_STR%BUFLY(1)%NVAR_MAT
         UVAR  =>ELBUF_STR%BUFLY(1)%MAT(IR,IS,1)%VAR
       ENDIF
@@ -438,14 +438,14 @@ C-------------------------------------------
      C     GS     ,SIGY   ,EPSPL   ,ISRATE  ,IPLA)
       ELSEIF (MTN == 136) THEN 
         CALL SIGEPS136G(
-     1     JLT    ,MATPARAM,RHO    ,LBUF%DMG,
+     1     JLT    ,MATPARAM,RHO    ,LBUF%DMG,THK0   ,
      3     DEPSXX ,DEPSYY ,DEPSXY  ,DEPSYZ  ,DEPSZX ,
      4     DEPBXX ,DEPBYY ,DEPBXY  ,
      5     SIGOXX ,SIGOYY ,SIGOXY  ,SIGOYZ  ,SIGOZX ,
-     6     MOMOXX ,MOMOYY ,MOMOXY  ,
      7     SIGNXX ,SIGNYY ,SIGNXY  ,SIGNYZ  ,SIGNZX ,
      8     MOMNXX ,MOMNYY ,MOMNXY  ,
-     9     SSP    ,ETSE   ,GS      )
+     9     SSP    ,ETSE   ,GS      ,NUVAR   ,UVAR   ,
+     A     SHF    )
       ENDIF ! IF (MTN == 1) THEN
 C-----------------------
 C     DAMPING
