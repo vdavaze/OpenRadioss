@@ -1287,7 +1287,7 @@
               call hm_read_mat136(&
               &matparam ,nuvar    ,nfunc    ,parmat  ,unitab   ,&
               &mat_id   ,titr     ,mtag     ,nvartmp ,lsubmodel,&
-              &ntable   ,table    ,iout     )
+              &iout     )
 !-------
              case ('LAW151','MULTIFLUID')
               ilaw  = 151

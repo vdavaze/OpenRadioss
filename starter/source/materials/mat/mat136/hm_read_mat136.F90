@@ -24,7 +24,7 @@
       contains
         subroutine hm_read_mat136(                                             &
           matparam ,nuvar    ,nfunc    ,parmat   ,unitab   ,mat_id   ,titr   , &
-          mtag     ,nvartmp  ,lsubmodel,ntable   ,table    ,iout     )
+          mtag     ,nvartmp  ,lsubmodel,iout     )
 !-----------------------------------------------
 !   M o d u l e s
 !-----------------------------------------------
@@ -35,7 +35,6 @@
           use constant_mod
           use mat_table_copy_mod
           use hm_option_read_mod
-          use table_mod
           use message_mod
           use precision_mod, only: WP
 !-----------------------------------------------
@@ -55,14 +54,16 @@
           type(mlaw_tag_),        intent(inout) :: mtag      !< Material tags structure
           integer,                intent(inout) :: nvartmp   !< Number of temporary variables
           type(submodel_data), dimension(nsubmod), intent(in) :: lsubmodel !< Submodel data structure
-          integer, intent(in)                   :: ntable    !< Number of tables
-          type(ttable),dimension(ntable),intent(in) :: table !< Tables data structure
           integer, intent(in)                   :: iout      !< Output file number
 !-----------------------------------------------
 !   L o c a l   V a r i a b l e s
 !-----------------------------------------------
-          real(kind=WP) :: e, nu, rho0, bulk, shear, lambda_m, mu_m, lambda_b, &
-             mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax, qp1, qp2, gamma
+          real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda_m, mu_m,         &
+            lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax,            &
+            qp1, qp2, gamma
+          integer :: i, nlayer 
+          real(kind=WP), dimension(:), allocatable :: omega_x, omega_y, rho_x, &
+            rho_y, sigy
           integer :: ilaw
           logical :: is_available,is_encrypted
 !-----------------------------------------------
@@ -78,16 +79,28 @@
           call hm_get_floatv('MAT_RHO'          ,rho0   ,is_available, lsubmodel, unitab)
           !----------------------------------------------------------------------------------
           !< 1st line of material card
-          call hm_get_floatv('MAT_E'            ,e      ,is_available, lsubmodel, unitab)
-          call hm_get_floatv('MAT_NU'           ,nu     ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_EC'           ,ec     ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_NUC'          ,nuc    ,is_available, lsubmodel, unitab)
+          !----------------------------------------------------------------------------------
+          !< 2nd line of material card
           call hm_get_floatv('MAT_FT'           ,f_t    ,is_available, lsubmodel, unitab)
           call hm_get_floatv('MAT_FC'           ,f_c    ,is_available, lsubmodel, unitab)
           call hm_get_floatv('MAT_GAMMA'        ,gamma  ,is_available, lsubmodel, unitab)
-          !----------------------------------------------------------------------------------
-          !< 2nd line of material card
           call hm_get_floatv('MAT_QP1'          ,qp1    ,is_available, lsubmodel, unitab)
           call hm_get_floatv('MAT_QP2'          ,qp2    ,is_available, lsubmodel, unitab)
           !----------------------------------------------------------------------------------
+          !< 3rd line of material card
+          call hm_get_intv  ('NLAYER_REINF'     ,nlayer ,is_available, lsubmodel)
+          !----------------------------------------------------------------------------------
+          !< 4th line of material card
+          allocate(sigy(nlayer),omega_x(nlayer),omega_y(nlayer),rho_x(nlayer),rho_y(nlayer))
+          do i = 1, nlayer
+            call hm_get_float_array_index('MAT_SIGY'   ,sigy(i)   ,i,is_available,lsubmodel,unitab)
+            call hm_get_float_array_index('MAT_OMEGA_X',omega_x(i),i,is_available,lsubmodel,unitab)
+            call hm_get_float_array_index('MAT_OMEGA_Y',omega_y(i),i,is_available,lsubmodel,unitab)
+            call hm_get_float_array_index('MAT_RHO_X'  ,rho_x(i)  ,i,is_available,lsubmodel,unitab)
+            call hm_get_float_array_index('MAT_RHO_Y'  ,rho_y(i)  ,i,is_available,lsubmodel,unitab)
+          enddo
 !
           !----------------------------------------------------------------------------------
           !< Parameters default values
@@ -97,15 +110,15 @@
           !< Elastic constants
           !----------------------------------------------------------------------------------
           !< Membrane elastic parameters
-          lambda_m = e*nu/(one - nu*nu)
-          mu_m     = e/(two*(one + nu))
+          lambda_m = ec*nuc/(one - nuc*nuc)
+          mu_m     = ec/(two*(one + nuc))
           !< Bending elastic parameters
-          lambda_b = e*nu/(12.0d0*(one - nu*nu))
-          mu_b     = e/(24.0d0*(one + nu))
+          lambda_b = ec*nuc/(12.0d0*(one - nuc*nuc))
+          mu_b     = ec/(24.0d0*(one + nuc))
           !< Shear modulus
-          shear    = e/(two*(one + nu))
+          shear    = ec/(two*(one + nuc))
           !< Bulk modulus
-          bulk     = e/(three*(one - two*nu))
+          bulk     = ec/(three*(one - two*nuc))
 !
           !----------------------------------------------------------------------------------
           !< Damage constants
@@ -118,7 +131,7 @@
           !< Number of integer material parameters
           matparam%niparam = 1
           !< Number of real material parameters
-          matparam%nuparam = 8
+          matparam%nuparam = 8 + 5*nlayer
           !< Number of user variables
           nuvar = 5
           !< Number of functions
@@ -126,7 +139,6 @@
           !< Number of tables and temporary variables
           matparam%ntable = 0
           nvartmp = 0
-          if (1 == 2) write(*,*) table(1)%ndim
 !
           !< Allocation of material parameters tables
           allocate(matparam%iparam(matparam%niparam))
@@ -134,26 +146,33 @@
           allocate(matparam%table (matparam%ntable ))
 !
           !< Integer material parameters
-          matparam%iparam(1)  = 1
+          matparam%iparam(1)  = nlayer
 !
           !< Real material parameters
-          matparam%young     = e
-          matparam%nu        = nu
-          matparam%shear     = shear
-          matparam%bulk      = bulk
-          matparam%uparam(1) = lambda_m
-          matparam%uparam(2) = mu_m
-          matparam%uparam(3) = lambda_b
-          matparam%uparam(4) = mu_b
-          matparam%uparam(5) = f_t
-          matparam%uparam(6) = f_c
-          matparam%uparam(7) = gamma
-          matparam%uparam(8) = dmax
+          matparam%young      = ec
+          matparam%nu         = nuc
+          matparam%shear      = shear
+          matparam%bulk       = bulk
+          matparam%uparam(1)  = lambda_m
+          matparam%uparam(2)  = mu_m
+          matparam%uparam(3)  = lambda_b
+          matparam%uparam(4)  = mu_b
+          matparam%uparam(5)  = f_t
+          matparam%uparam(6)  = f_c
+          matparam%uparam(7)  = gamma
+          matparam%uparam(8)  = dmax
+          do i = 1, nlayer
+            matparam%uparam(8 + 5*(i-1) + 1) = sigy(i)
+            matparam%uparam(8 + 5*(i-1) + 2) = omega_x(i)
+            matparam%uparam(8 + 5*(i-1) + 3) = omega_y(i)
+            matparam%uparam(8 + 5*(i-1) + 4) = rho_x(i)
+            matparam%uparam(8 + 5*(i-1) + 5) = rho_y(i)
+          enddo
 !
           !< PARMAT table
           parmat(1)  = bulk
-          parmat(2)  = e
-          parmat(3)  = nu
+          parmat(2)  = ec
+          parmat(3)  = nuc
           parmat(16) = 2 
           parmat(17) = two*shear/(bulk+four_over_3*shear)
 !
@@ -168,6 +187,7 @@
           mtag%l_pla  = 1
           mtag%g_dmg  = 3
           mtag%l_dmg  = 3
+          mtag%l_sigb = 5
 !
           ! Number of output modes 
           matparam%nmod = 2
@@ -193,7 +213,12 @@
             write(iout,'(5X,A,//)') 'CONFIDENTIAL DATA'
           else
             write(iout,1002) rho0
-            write(iout,1003) e,nu,f_t,f_c,gamma,qp1,qp2,dmax
+            write(iout,1003) ec,nuc
+            write(iout,1004) f_t,f_c,gamma,qp1,qp2,dmax
+            write(iout,1005) 
+            do i = 1,nlayer
+              write(iout,1006) i,sigy(i),omega_x(i),omega_y(i),rho_x(i),rho_y(i)
+            enddo
           endif
 !
           !----------------------------------------------------------------------------------
@@ -213,13 +238,26 @@
             5X,"ELASTIC PARAMETERS:                                     ",/,       &
             5X,"-------------------                                     ",/,       &
             5X,"YOUNG MODULUS (E) . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
-            5X,"POISSON RATIO (NU). . . . . . . . . . . . . . . . . . .=",1PG20.13/&
+            5X,"POISSON RATIO (NU). . . . . . . . . . . . . . . . . . .=",1PG20.13/)
+1004      format(/                                                                 &
+            5X,"BENDING DAMAGE PARAMETERS:                              ",/,       &
+            5X,"--------------------------                              ",/,       &
             5X,"TENSILE STRENGTH (FT) . . . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"COMPRESSIVE STRENGTH (FC) . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"GAMMA . . . . . . . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"SLOPE 1 . . . . . . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"SLOPE 2 . . . . . . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"MAXIMUM DAMAGE (DMAX) . . . . . . . . . . . . . . . . .=",1PG20.13/)
+1005      format(/                                                                 &
+            5X,"STEEL REINFORCEMENT PLASTICITY PARAMETERS:              ",/,       &
+            5X,"------------------------------------------              ",/)
+1006      format(/                                                                 &
+            5X,"REINFORCEMENT LAYER NO # ",I3/                                     &
+            5X,"STEEL YIELD STRESS (SIGY) . . . . . . . . . . . . . . .=",1PG20.13/&
+            5X,"AREA OF THE REINFORCEMENT IN X DIRECTION (OMEGA_X). . .=",1PG20.13/&
+            5X,"AREA OF THE REINFORCEMENT IN Y DIRECTION (OMEGA_Y). . .=",1PG20.13/&
+            5X,"POSITION IN THICKNESS OF REINF. IN X DIRECTION (RHO_X).=",1PG20.13/&
+            5X,"POSITION IN THICKNESS OF REINF. IN Y DIRECTION (RHO_Y).=",1PG20.13/)
 !
         end subroutine hm_read_mat136
       end module hm_read_mat136_mod
