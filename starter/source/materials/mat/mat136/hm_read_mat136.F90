@@ -60,7 +60,8 @@
 !-----------------------------------------------
           real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda_m, mu_m,         &
             lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax,            &
-            qp1, qp2, gamma
+            qp1, qp2, gamma, cn1x, cn1y, cm1x, cm1y, cm1xy, cn2x, cn2y, cm2x,  &
+            cm2y, cm2xy
           integer :: i, nlayer 
           real(kind=WP), dimension(:), allocatable :: omega_x, omega_y, rho_x, &
             rho_y, sigy
@@ -101,6 +102,20 @@
             call hm_get_float_array_index('MAT_RHO_X'  ,rho_x(i)  ,i,is_available,lsubmodel,unitab)
             call hm_get_float_array_index('MAT_RHO_Y'  ,rho_y(i)  ,i,is_available,lsubmodel,unitab)
           enddo
+          !----------------------------------------------------------------------------------
+          !< 5th line of material card
+          call hm_get_float_array_index('MAT_CN1X'   ,cn1x    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CN1Y'   ,cn1y    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CM1X'   ,cm1x    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CM1Y'   ,cm1y    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CM1XY'  ,cm1xy   ,1,is_available,lsubmodel,unitab)
+          !-----------------------------------------------------------------------------------
+          !< 6th line of material card
+          call hm_get_float_array_index('MAT_CN2X'   ,cn2x    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CN2Y'   ,cn2y    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CM2X'   ,cm2x    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CM2Y'   ,cm2y    ,1,is_available,lsubmodel,unitab)
+          call hm_get_float_array_index('MAT_CM2XY'  ,cm2xy   ,1,is_available,lsubmodel,unitab)
 !
           !----------------------------------------------------------------------------------
           !< Parameters default values
@@ -133,7 +148,7 @@
           !< Number of real material parameters
           matparam%nuparam = 8 + 5*nlayer
           !< Number of user variables
-          nuvar = 5
+          nuvar = 3
           !< Number of functions
           nfunc = 0
           !< Number of tables and temporary variables
@@ -220,6 +235,9 @@
               write(iout,1006) i,sigy(i),omega_x(i),omega_y(i),rho_x(i),rho_y(i)
             enddo
           endif
+!
+          !< Array deallocation
+          deallocate(sigy,omega_x,omega_y,rho_x,rho_y)
 !
           !----------------------------------------------------------------------------------
           !< Output formats
