@@ -91,13 +91,14 @@
           dkap2dkxy,phi_b_pos,phi_b_neg,b1,b2,den,depsp_x,depsp_y,dkp_x,       &
           dkp_y,dkp_xy,det2,dfI_dNx,dfI_dNy,dfI_dMx,dfI_dMy,dfI_dMxy,          &
           dfII_dNx,dfII_dNy,dfII_dMx,dfII_dMy,dfII_dMxy,lam_I,lam_II,n_star,   &
-          n_f,na,S_j,xi_k
+          n_f,na,S_j,xi_k, n_f_old, eta_a, eta_b, S_a, S_b
         real(kind=WP), dimension(nel) :: xi_tr, epbxx, epbyy, epbxy, xi_kap1,  &
           xi_kap2, Db11, Db12, Db21, Db22, Db33, mfx_pos, mfx_neg, mfy_pos,    &
           mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p, Db32,     &
           Db31, Db13, Db23
         real(kind=WP), dimension(:), allocatable :: rho_ext_x, rho_ext_y,      &
           rho_x, rho_y, sig_y, omega_x, omega_y
+        logical :: found
 !
         !=======================================================================
         !< - Initialisation of computation on time step
@@ -111,8 +112,8 @@
         young    = matparam%young                          !< Concrete Young's modulus
         nu       = matparam%nu                             !< Concrete Poisson's ratio
         shear    = matparam%shear                          !< Concrete shear modulus
-        lambda_m = matparam%uparam(1)                      !< Membrane Lamé parameter (precomputed in hm_read_mat136)
-        mu_m     = matparam%uparam(2)                      !< Membrane shear modulus (precomputed in hm_read_mat136)
+        lambda_m = matparam%uparam(1)                      !< Membrane Lamé parameter
+        mu_m     = matparam%uparam(2)                      !< Membrane shear modulus
         f_t      = matparam%uparam(5)                      !< Concrete Tensile strength
         f_c      = matparam%uparam(6)                      !< Concrete Compressive strength
         gamma    = matparam%uparam(7)                      !< Concrete 
@@ -131,8 +132,8 @@
         Dm21 = Dm12                                        !< Membrane stiffness D21 = lambda
         Dm22 = Dm11                                        !< Membrane stiffness D22 = lambda + 2*mu 
         gs(1:nel) = shear*shf(1:nel)                       !< Correction factor for transverse shear 
-        lambda_b(1:nel) = thk0(1:nel)*matparam%uparam(3)   !< Bending Lamé parameter (precomputed in hm_read_mat136)
-        mu_b(1:nel) = thk0(1:nel)*matparam%uparam(4)       !< Bending shear modulus (precomputed in hm_read_mat136)
+        lambda_b(1:nel) = thk0(1:nel)*matparam%uparam(3)   !< Bending Lamé parameter
+        mu_b(1:nel) = thk0(1:nel)*matparam%uparam(4)       !< Bending shear modulus
         k0_1(1:nel) = f_t*f_t*(one - nu*nu) / &            !< Bending damage threshold in positive bending (tension inner face)                  
                       (six*young*thk0(1:nel)*thk0(1:nel)) 
         k0_2(1:nel) = f_c*f_c*(one - nu*nu) / &            !< Bending damage threshold in negative bending (tension outer face)
@@ -334,35 +335,64 @@
           rho_ext_y(k) = rho_y(k)
         end do
         rho_ext_y(nlayer + 1) = one
+        ! write(*,*) 'rho_ext_x = ', rho_ext_x(0:nlayer+1)
 !
         !< Critical moment for the plasticity criterion in bending for the 
         !  reinforcement in x direction
         !-----------------------------------------------------------------------
         !< Loop over the elements
         do i = 1, nel
-          na = two/(thk0(i)*f_c)
           !---------------------------------------------------------------------
           !< Positive bending moment 
           !---------------------------------------------------------------------
-          n_f = two
+          found = .false.
           do j = 0, nlayer
-            S_j = zero
+            eta_a = rho_ext_x(j)
+            eta_b = rho_ext_x(j+1)
+            ! f en eta_a
+            S_a = signxx(i)*thk0(i) - f_c*thk0(i)*half*(eta_a - one)
             do k = 1, nlayer
-              if (rho_x(k) < rho_ext_x(j)) then
-                xi_k =  one
-              else
+              if (eta_a < rho_x(k)) then
                 xi_k = -one
+              else
+                xi_k =  one
               endif
-              S_j = S_j + sig_y(k) * omega_x(k) * xi_k
+              S_a = S_a - sig_y(k)*omega_x(k)*xi_k
             enddo
-            n_star = one + na * (signxx(i) - S_j)
-            if ((n_star >= rho_ext_x(j)).and.                                  &
-                (n_star < rho_ext_x(j+1))) then
-              n_f = n_star
+            ! f en eta_b
+            S_b = signxx(i)*thk0(i) - f_c*thk0(i)*half*(eta_b - one)
+            do k = 1, nlayer
+              if (eta_b < rho_x(k)) then
+                xi_k = -one
+              else
+                xi_k =  one
+              endif
+              S_b = S_b - sig_y(k)*omega_x(k)*xi_k
+            enddo
+            write(*,*) 'S_a = ', S_a, 'S_b = ', S_b, 'eta_a = ', eta_a, 'eta_b = ', eta_b, j
+            ! Changement de signe => solution dans cet intervalle
+            if (S_a * S_b <= zero) then
+              ! Newton dans cet intervalle (converge en 1 iteration car f lineaire !)
+              n_f = eta_a - S_a * ((eta_b - eta_a) / (S_b - S_a))
+              write(*,*) 'n_f_newton = ', n_f
+              found = .true.
               exit
             endif
           enddo
+          write(*,*) 'n_f = ', n_f
+          S_a = signxx(i)*thk0(i) - f_c*thk0(i)*half*(n_f - one)
+          do k = 1, nlayer
+            if (n_f < rho_x(k)) then
+              xi_k = -one
+            else
+              xi_k =  one
+            endif
+            S_a = S_a - sig_y(k)*omega_x(k)*xi_k
+          enddo
+          write(*,*) 'S_a_check = ', S_a
+          pause
           if (n_f > one) n_f = max(-one, min(one, n_star))
+          ! write(*,*) 'n_f = ', n_f
           mfx_pos(i) = (thk0(i)**2 *f_c/four)*(one - n_f**2)
           dmfx_pos(i) = -thk0(i) * n_f
           do k = 1, nlayer
@@ -370,6 +400,8 @@
                        + sig_y(k)*omega_x(k)*sign(one,n_f-rho_x(k))*           &
                          rho_x(k)*thk0(i)*half     
           enddo  
+          ! write(*,*) 'mfx_pos(i) = ', mfx_pos(i)
+          ! pause
           !---------------------------------------------------------------------
           !< Negative bending moment
           !---------------------------------------------------------------------
@@ -398,7 +430,7 @@
             mfx_neg(i) = mfx_neg(i)                                            &
                        - sig_y(k)*omega_x(k)*sign(one,n_f-rho_x(k))*           &
                          rho_x(k)*thk0(i)*half
-          enddo                        
+          enddo
         enddo
 !
         do i = 1,nel
@@ -474,6 +506,8 @@
                                                  momnxy(i)*momnxy(i)
           f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +        &
                                                  momnxy(i)*momnxy(i)
+          f1p(i) = -ep20
+          f2p(i) = -ep20
         enddo
 !
         !< Index of the active criteria

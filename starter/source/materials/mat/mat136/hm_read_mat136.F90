@@ -234,6 +234,7 @@
             do i = 1,nlayer
               write(iout,1006) i,sigy(i),omega_x(i),omega_y(i),rho_x(i),rho_y(i)
             enddo
+            write(iout,1007)
           endif
 !
           !< Array deallocation
@@ -243,9 +244,9 @@
           !< Output formats
           !----------------------------------------------------------------------------------
 1000      format(/                                                                 &
-            5X,"-------------------------------------------------------",/         &
-            5X,"       MATERIAL MODEL: GLOBAL REINFORCED CONCRETE      ",/,        &
-            5X,"-------------------------------------------------------",/)
+            5X,"========================================================",/        &
+            5X,"       MATERIAL MODEL: GLOBAL REINFORCED CONCRETE       ",/,       &
+            5X,"========================================================",/)
 1001      format(/                                                                 &
             5X,A,/,                                                                &
             5X,"MATERIAL NUMBER . . . . . . . . . . . . . . . . . . . .=",I10/,    &
@@ -262,10 +263,10 @@
             5X,"--------------------------                              ",/,       &
             5X,"TENSILE STRENGTH (FT) . . . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"COMPRESSIVE STRENGTH (FC) . . . . . . . . . . . . . . .=",1PG20.13/&
-            5X,"GAMMA . . . . . . . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
-            5X,"SLOPE 1 . . . . . . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
-            5X,"SLOPE 2 . . . . . . . . . . . . . . . . . . . . . . . .=",1PG20.13/&
-            5X,"MAXIMUM DAMAGE (DMAX) . . . . . . . . . . . . . . . . .=",1PG20.13/)
+            5X,"DAMAGE SLOPE RATIO BEFORE/AFTER CRACKING (GAMMA). . . .=",1PG20.13/&
+            5X,"SLOPE QUOTIENT FOR POSITIVE BENDING (QP1) . . . . . . .=",1PG20.13/&
+            5X,"SLOPE QUOTIENT FOR NEGATIVE BENDING (QP2) . . . . . . .=",1PG20.13/&
+            5X,"MAXIMUM DAMAGE COMPUTED . . . . . . . . . . . . . . . .=",1PG20.13/)
 1005      format(/                                                                 &
             5X,"STEEL REINFORCEMENT PLASTICITY PARAMETERS:              ",/,       &
             5X,"------------------------------------------              ",/)
@@ -276,6 +277,8 @@
             5X,"AREA OF THE REINFORCEMENT IN Y DIRECTION (OMEGA_Y). . .=",1PG20.13/&
             5X,"POSITION IN THICKNESS OF REINF. IN X DIRECTION (RHO_X).=",1PG20.13/&
             5X,"POSITION IN THICKNESS OF REINF. IN Y DIRECTION (RHO_Y).=",1PG20.13/)
+1007 format(/                                                                  &
+            5X,"========================================================",/)
 !
         end subroutine hm_read_mat136
       end module hm_read_mat136_mod
