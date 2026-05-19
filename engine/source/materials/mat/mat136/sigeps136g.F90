@@ -350,44 +350,61 @@
             eta_a = rho_ext_x(j)
             eta_b = rho_ext_x(j+1)
             ! f en eta_a
-            S_a = signxx(i)*thk0(i) - f_c*thk0(i)*half*(eta_a - one)
+            S_a = signxx(i)/f_c - half*(eta_a - one)
             do k = 1, nlayer
               if (eta_a < rho_x(k)) then
                 xi_k = -one
               else
                 xi_k =  one
               endif
-              S_a = S_a - sig_y(k)*omega_x(k)*xi_k
+              S_a = S_a - sig_y(k)*omega_x(k)*xi_k/(thk0(i)*f_c)
             enddo
             ! f en eta_b
-            S_b = signxx(i)*thk0(i) - f_c*thk0(i)*half*(eta_b - one)
+            S_b = signxx(i)/f_c - half*(eta_b - one)
             do k = 1, nlayer
               if (eta_b < rho_x(k)) then
                 xi_k = -one
               else
                 xi_k =  one
               endif
-              S_b = S_b - sig_y(k)*omega_x(k)*xi_k
+              S_b = S_b - sig_y(k)*omega_x(k)*xi_k/(thk0(i)*f_c)
             enddo
-            write(*,*) 'S_a = ', S_a, 'S_b = ', S_b, 'eta_a = ', eta_a, 'eta_b = ', eta_b, j
             ! Changement de signe => solution dans cet intervalle
             if (S_a * S_b <= zero) then
               ! Newton dans cet intervalle (converge en 1 iteration car f lineaire !)
               n_f = eta_a - S_a * ((eta_b - eta_a) / (S_b - S_a))
-              write(*,*) 'n_f_newton = ', n_f
               found = .true.
               exit
             endif
           enddo
+
+          found  = .false.
+          n_f    = zero
+          do k = 0, nlayer
+            eta_a = (rho_ext_x(k) + rho_ext_x(k+1))*half 
+            S_a = zero
+            do j = 1,nlayer
+              S_a = S_a + sig_y(j)*omega_x(j)*sign(one, eta_a - rho_x(j))
+            enddo
+            n_f = one + (two / (thk0(i) * f_c)) * (signxx(i)*thk0(i) - S_a)
+            if (n_f >= rho_ext_x(k) - 1.0e-10_wp .and. n_f <= rho_ext_x(k+1) + 1.0e-10_wp) then
+              ! Clamp n_f dans [-1, +1] au cas où il dépasse légèrement
+              n_f   = max(-one, min(one, n_f))
+              found = .true.
+              exit
+            endif
+          enddo
+
+
           write(*,*) 'n_f = ', n_f
-          S_a = signxx(i)*thk0(i) - f_c*thk0(i)*half*(n_f - one)
+          S_a = signxx(i)/f_c - half*(n_f - one)
           do k = 1, nlayer
             if (n_f < rho_x(k)) then
               xi_k = -one
             else
               xi_k =  one
             endif
-            S_a = S_a - sig_y(k)*omega_x(k)*xi_k
+            S_a = S_a - sig_y(k)*omega_x(k)*xi_k/(thk0(i)*f_c)
           enddo
           write(*,*) 'S_a_check = ', S_a
           pause
