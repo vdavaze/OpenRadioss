@@ -345,80 +345,36 @@
           !---------------------------------------------------------------------
           !< Positive bending moment 
           !---------------------------------------------------------------------
-          found = .false.
-          do j = 0, nlayer
-            eta_a = rho_ext_x(j)
-            eta_b = rho_ext_x(j+1)
-            ! f en eta_a
-            S_a = signxx(i)/f_c - half*(eta_a - one)
-            do k = 1, nlayer
-              if (eta_a < rho_x(k)) then
-                xi_k = -one
-              else
-                xi_k =  one
-              endif
-              S_a = S_a - sig_y(k)*omega_x(k)*xi_k/(thk0(i)*f_c)
-            enddo
-            ! f en eta_b
-            S_b = signxx(i)/f_c - half*(eta_b - one)
-            do k = 1, nlayer
-              if (eta_b < rho_x(k)) then
-                xi_k = -one
-              else
-                xi_k =  one
-              endif
-              S_b = S_b - sig_y(k)*omega_x(k)*xi_k/(thk0(i)*f_c)
-            enddo
-            ! Changement de signe => solution dans cet intervalle
-            if (S_a * S_b <= zero) then
-              ! Newton dans cet intervalle (converge en 1 iteration car f lineaire !)
-              n_f = eta_a - S_a * ((eta_b - eta_a) / (S_b - S_a))
-              found = .true.
-              exit
-            endif
-          enddo
-
-          found  = .false.
-          n_f    = zero
-          do k = 0, nlayer
-            eta_a = (rho_ext_x(k) + rho_ext_x(k+1))*half 
-            S_a = zero
-            do j = 1,nlayer
-              S_a = S_a + sig_y(j)*omega_x(j)*sign(one, eta_a - rho_x(j))
-            enddo
-            n_f = one + (two / (thk0(i) * f_c)) * (signxx(i)*thk0(i) - S_a)
-            if (n_f >= rho_ext_x(k) - 1.0e-10_wp .and. n_f <= rho_ext_x(k+1) + 1.0e-10_wp) then
-              ! Clamp n_f dans [-1, +1] au cas où il dépasse légèrement
-              n_f   = max(-one, min(one, n_f))
-              found = .true.
-              exit
-            endif
-          enddo
-
-
-          write(*,*) 'n_f = ', n_f
-          S_a = signxx(i)/f_c - half*(n_f - one)
-          do k = 1, nlayer
-            if (n_f < rho_x(k)) then
-              xi_k = -one
+          n_f = huge(one)
+          !< Case 1: eta < rho_x(1)
+          eta_a =  sig_y(1)*omega_x(1) + sig_y(2)*omega_x(2)
+          eta_a = one + (two / (thk0(i) * f_c)) * (signxx(i)*thk0(i) + eta_a)
+          if (eta_a < rho_x(1)) then
+            n_f = eta_a
+          else
+            !< Case 2: rho_x(1) <= eta < rho_x(2)
+            eta_a = -sig_y(1)*omega_x(1) + sig_y(2)*omega_x(2)
+            eta_a = one + (two / (thk0(i) * f_c)) * (signxx(i)*thk0(i) + eta_a)
+            if ((eta_a > rho_x(1)) .and. (eta_a < rho_x(2))) then
+              n_f = eta_a
             else
-              xi_k =  one
+              !< Case 3 : eta >= rho_x(2)
+              eta_a = -sig_y(1)*omega_x(1) - sig_y(2)*omega_x(2)
+              eta_a = one + (two / (thk0(i) * f_c)) * (signxx(i)*thk0(i) + eta_a)
+              if (eta_a > rho_x(2)) then
+                n_f = eta_a
+              endif
             endif
-            S_a = S_a - sig_y(k)*omega_x(k)*xi_k/(thk0(i)*f_c)
-          enddo
-          write(*,*) 'S_a_check = ', S_a
-          pause
-          if (n_f > one) n_f = max(-one, min(one, n_star))
-          ! write(*,*) 'n_f = ', n_f
-          mfx_pos(i) = (thk0(i)**2 *f_c/four)*(one - n_f**2)
+          endif
+          n_f = max(-one, min(one, n_f))
+          write(*,*) 'n_f = ', n_f
+          mfx_pos(i) = ((thk0(i)**2)*f_c/eight)*(one - n_f**2)
           dmfx_pos(i) = -thk0(i) * n_f
-          do k = 1, nlayer
-            mfx_pos(i) = mfx_pos(i)                                            &
-                       + sig_y(k)*omega_x(k)*sign(one,n_f-rho_x(k))*           &
-                         rho_x(k)*thk0(i)*half     
-          enddo  
-          ! write(*,*) 'mfx_pos(i) = ', mfx_pos(i)
-          ! pause
+          mfx_pos(i) = mfx_pos(i) - sig_y(1)*omega_x(1)*sign(one,n_f-rho_x(1))* &
+                      rho_x(1)*thk0(i)*half - sig_y(2)*omega_x(2)*sign(one,n_f-rho_x(2))* &
+                      rho_x(2)*thk0(i)*half    
+          write(*,*) 'mfx_pos(i) = ', mfx_pos(i)
+          pause
           !---------------------------------------------------------------------
           !< Negative bending moment
           !---------------------------------------------------------------------
