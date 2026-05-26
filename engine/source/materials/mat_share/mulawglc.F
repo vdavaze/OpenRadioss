@@ -445,7 +445,7 @@ C-------------------------------------------
      7     SIGNXX ,SIGNYY ,SIGNXY  ,SIGNYZ  ,SIGNZX ,
      8     MOMNXX ,MOMNYY ,MOMNXY  ,
      9     SSP    ,ETSE   ,GS      ,NUVAR   ,UVAR   ,
-     A     SHF    )
+     A     SHF    ,LBUF%PLA,LBUF%SIGB)
       ENDIF ! IF (MTN == 1) THEN
 C-----------------------
 C     DAMPING

@@ -60,8 +60,8 @@
 !-----------------------------------------------
           real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda_m, mu_m,         &
             lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax,            &
-            qp1, qp2, gamma, cn1x, cn1y, cm1x, cm1y, cm1xy, cn2x, cn2y, cm2x,  &
-            cm2y, cm2xy
+            qp1, qp2, gamma, cn1x, cn1y, cn1xy, cm1x, cm1y, cm1xy, cn2x, cn2y, & 
+            cn2xy, cm2x, cm2y, cm2xy
           integer :: i, nlayer 
           real(kind=WP), dimension(:), allocatable :: omega_x, omega_y, rho_x, &
             rho_y, sigy
@@ -104,18 +104,24 @@
           enddo
           !----------------------------------------------------------------------------------
           !< 5th line of material card
-          call hm_get_float_array_index('MAT_CN1X'   ,cn1x    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CN1Y'   ,cn1y    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CM1X'   ,cm1x    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CM1Y'   ,cm1y    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CM1XY'  ,cm1xy   ,1,is_available,lsubmodel,unitab)
-          !-----------------------------------------------------------------------------------
+          call hm_get_floatv('MAT_CN1X'         ,cn1x  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CN1Y'         ,cn1y  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CN1XY'        ,cn1xy ,is_available,lsubmodel,unitab)
+          !----------------------------------------------------------------------------------
           !< 6th line of material card
-          call hm_get_float_array_index('MAT_CN2X'   ,cn2x    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CN2Y'   ,cn2y    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CM2X'   ,cm2x    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CM2Y'   ,cm2y    ,1,is_available,lsubmodel,unitab)
-          call hm_get_float_array_index('MAT_CM2XY'  ,cm2xy   ,1,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CN2X'         ,cn2x  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CN2Y'         ,cn2y  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CN2XY'        ,cn2xy ,is_available,lsubmodel,unitab)
+          !-----------------------------------------------------------------------------------
+          !< 7th line of material card
+          call hm_get_floatv('MAT_CM1X'         ,cm1x  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CM1Y'         ,cm1y  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CM1XY'        ,cm1xy ,is_available,lsubmodel,unitab)
+          !----------------------------------------------------------------------------------
+          !< 8th line of material card
+          call hm_get_floatv('MAT_CM2X'         ,cm2x  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CM2Y'         ,cm2y  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CM2XY'        ,cm2xy ,is_available,lsubmodel,unitab)
 !
           !----------------------------------------------------------------------------------
           !< Parameters default values
@@ -146,9 +152,9 @@
           !< Number of integer material parameters
           matparam%niparam = 1
           !< Number of real material parameters
-          matparam%nuparam = 8 + 5*nlayer
+          matparam%nuparam = 20 + 5*nlayer
           !< Number of user variables
-          nuvar = 3
+          nuvar = 8
           !< Number of functions
           nfunc = 0
           !< Number of tables and temporary variables
@@ -176,12 +182,24 @@
           matparam%uparam(6)  = f_c
           matparam%uparam(7)  = gamma
           matparam%uparam(8)  = dmax
+          matparam%uparam(9)  = cn1x
+          matparam%uparam(10) = cn1y
+          matparam%uparam(11) = cn1xy
+          matparam%uparam(12) = cn2x
+          matparam%uparam(13) = cn2y
+          matparam%uparam(14) = cn2xy
+          matparam%uparam(15) = cm1x
+          matparam%uparam(16) = cm1y
+          matparam%uparam(17) = cm1xy
+          matparam%uparam(18) = cm2x
+          matparam%uparam(19) = cm2y
+          matparam%uparam(20) = cm2xy
           do i = 1, nlayer
-            matparam%uparam(8 + 5*(i-1) + 1) = sigy(i)
-            matparam%uparam(8 + 5*(i-1) + 2) = omega_x(i)
-            matparam%uparam(8 + 5*(i-1) + 3) = omega_y(i)
-            matparam%uparam(8 + 5*(i-1) + 4) = rho_x(i)
-            matparam%uparam(8 + 5*(i-1) + 5) = rho_y(i)
+            matparam%uparam(20 + 5*(i-1) + 1) = sigy(i)
+            matparam%uparam(20 + 5*(i-1) + 2) = omega_x(i)
+            matparam%uparam(20 + 5*(i-1) + 3) = omega_y(i)
+            matparam%uparam(20 + 5*(i-1) + 4) = rho_x(i)
+            matparam%uparam(20 + 5*(i-1) + 5) = rho_y(i)
           enddo
 !
           !< PARMAT table
@@ -234,7 +252,9 @@
             do i = 1,nlayer
               write(iout,1006) i,sigy(i),omega_x(i),omega_y(i),rho_x(i),rho_y(i)
             enddo
-            write(iout,1007)
+            write(iout,1007) cn1x, cn1y, cm1x, cm1y, cm1xy
+            write(iout,1008) cn2x, cn2y, cm2x, cm2y, cm2xy
+            write(iout,1009)
           endif
 !
           !< Array deallocation
@@ -268,8 +288,8 @@
             5X,"SLOPE QUOTIENT FOR NEGATIVE BENDING (QP2) . . . . . . .=",1PG20.13/&
             5X,"MAXIMUM DAMAGE COMPUTED . . . . . . . . . . . . . . . .=",1PG20.13/)
 1005      format(/                                                                 &
-            5X,"STEEL REINFORCEMENT PLASTICITY PARAMETERS:              ",/,       &
-            5X,"------------------------------------------              ",/)
+            5X,"STEEL REINFORCEMENT GEOMETRIC PARAMETERS:               ",/,       &
+            5X,"-----------------------------------------               ",/)
 1006      format(/                                                                 &
             5X,"REINFORCEMENT LAYER NO # ",I3/                                     &
             5X,"STEEL YIELD STRESS (SIGY) . . . . . . . . . . . . . . .=",1PG20.13/&
@@ -277,7 +297,21 @@
             5X,"AREA OF THE REINFORCEMENT IN Y DIRECTION (OMEGA_Y). . .=",1PG20.13/&
             5X,"POSITION IN THICKNESS OF REINF. IN X DIRECTION (RHO_X).=",1PG20.13/&
             5X,"POSITION IN THICKNESS OF REINF. IN Y DIRECTION (RHO_Y).=",1PG20.13/)
-1007 format(/                                                                  &
+1007      format(/                                                                 &
+            5X,"STEEL REINFORCEMENT PLASTICITY PARAMETERS:              ",/,       &
+            5X,"------------------------------------------              ",/,       &
+            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE BENDING (CN1X).=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE BENDING (CN1Y).=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE SHEAR (CM1X). .=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE SHEAR (CM1Y). .=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR COUPLING (CM1XY) . . . .=",1PG20.13/)
+1008      format(/                                                                 &
+            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE BENDING (CN2X).=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE BENDING (CN2Y).=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE SHEAR (CM2X). .=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE SHEAR (CM2Y). .=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR COUPLING (CM2XY) . . . .=",1PG20.13/)
+1009 format(/                                                                  &
             5X,"========================================================",/)
 !
         end subroutine hm_read_mat136
