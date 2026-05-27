@@ -95,7 +95,7 @@
           dfII_dNx,dfII_dNy,dfII_dMx,dfII_dMy,dfII_dMxy,lam_I,lam_II
         real(kind=WP), dimension(nel) :: xi_tr, epbxx, epbyy, epbxy, xi_kap1,  &
           xi_kap2, Db11, Db12, Db21, Db22, Db33, mfx_pos, mfx_neg, mfy_pos,    &
-          mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p
+          mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p, g1p, g2p
         real(kind=WP), dimension(2) :: rho_x, rho_y, sig_y, omega_x, omega_y
         real(kind=WP), parameter :: tol = 1e-3
         real(kind=WP), parameter :: xi_pos = 1.0d0
@@ -362,6 +362,8 @@
                                                  momnxy(i)*momnxy(i)
           f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +        &
                                                  momnxy(i)*momnxy(i)
+          g1p(i) =   momnxx(i) - mfx_pos(i) + momnyy(i) - mfy_pos(i)
+          g2p(i) = -(momnxx(i) - mfx_neg(i) + momnyy(i) - mfy_neg(i))
         enddo
 !
         !< Index of the active criteria
@@ -369,13 +371,14 @@
         nindx2 = 0
         nindx3 = 0
         do i = 1, nel
-          if (f1p(i) > zero .and. f2p(i) > zero) then
+          if ((f1p(i) > zero) .and. (f2p(i) > zero) .and.                      &
+              (g1p(i) > zero) .and. (g2p(i) > zero)) then
             nindx = nindx + 1
             indx(nindx) = i
-          else if (f1p(i) > zero) then
+          else if ((f1p(i) > zero) .and. (g1p(i) > zero)) then
             nindx2 = nindx2 + 1
             indx2(nindx2) = i
-          else if (f2p(i) > zero) then
+          else if ((f2p(i) > zero) .and. (g2p(i) > zero)) then
             nindx3 = nindx3 + 1
             indx3(nindx3) = i
           endif
@@ -489,6 +492,10 @@
                                                       momnxy(i)*momnxy(i)
               f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +    &
                                                       momnxy(i)*momnxy(i)
+              g1p(i) =   momnxx(i) - mfx_pos(i) + momnyy(i) - mfy_pos(i)
+              g2p(i) = -(momnxx(i) - mfx_neg(i) + momnyy(i) - mfy_neg(i))
+              if (g1p(i) <= zero) exit
+              if (g2p(i) <= zero) exit
             enddo
           enddo
         endif
@@ -567,6 +574,8 @@
               !< Update the plasticity criteria
               f1p(i) = -(momnxx(i) - mfx_pos(i))*(momnyy(i) - mfy_pos(i)) +    &
                                                       momnxy(i)*momnxy(i)
+              g1p(i) =   momnxx(i) - mfx_pos(i) + momnyy(i) - mfy_pos(i)
+              if (g1p(i) <= zero) exit
             enddo
           enddo
         endif
@@ -645,9 +654,20 @@
               !< Update the plasticity criteria
               f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +    &
                                                       momnxy(i)*momnxy(i)
+              g2p(i) = -(momnxx(i) - mfx_neg(i) + momnyy(i) - mfy_neg(i))
+              if (g2p(i) <= zero) exit
             enddo
           enddo
         endif
+! 
+        !< Remove the contribution of the back-stress to the stresses 
+        do i = 1, nel
+          signxx(i) = signxx(i) + sigb(i,1)
+          signyy(i) = signyy(i) + sigb(i,2)
+          momnxx(i) = momnxx(i) + sigb(i,3)
+          momnyy(i) = momnyy(i) + sigb(i,4)
+          momnxy(i) = momnxy(i) + sigb(i,5)
+        enddo
 !
         !=======================================================================
         end subroutine sigeps136g
@@ -763,7 +783,7 @@
           real(kind=WP) :: eta_lo, eta_hi, eta_mid
           real(kind=WP) :: N_lo, N_hi, N_mid, N
           real(kind=WP) :: n_f, xi_inf_x, xi_sup_x, xi_inf_y, xi_sup_y
-          real(kind=WP) :: gamma_x, gamma_y, rhox, rhoy
+          real(kind=WP) :: gamma_x, gamma_y, rhox, rhoy, denom_x, denom_y
           integer :: iter
           logical :: found
           real(kind=WP), parameter :: tol = 1.0d-8   ! tolerance sur eta
@@ -851,10 +871,20 @@
           gamma_y = (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))*sig_y(2)/(f_c*thk0)
 !
           !< Computation of the position of the equivalent reinforcement for the concrete contribution
-          rhox = (xi_sup_x*omega_x(2)*rho_x(2) + xi_inf_x*omega_x(1)*rho_x(1)) /   &
-                 (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))
-          rhoy = (xi_sup_y*omega_y(2)*rho_y(2) + xi_inf_y*omega_y(1)*rho_y(1)) /   &
+          denom_x = xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1)
+          if (abs(denom_x) < em20) then
+            rhox = zero
+          else
+            rhox = (xi_sup_x*omega_x(2)*rho_x(2) + xi_inf_x*omega_x(1)*rho_x(1)) / &
+                   (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))
+          endif
+          denom_y = xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1)
+          if (abs(denom_y) < em20) then
+            rhoy = zero
+          else
+            rhoy = (xi_sup_y*omega_y(2)*rho_y(2) + xi_inf_y*omega_y(1)*rho_y(1)) / &
                  (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))
+          endif
 !
           !< Computation of the bending moment for the given sigma
           M_val = -half*xi*rhox*gamma_x*(cos(alpha))**2 -                      &
