@@ -60,11 +60,8 @@
 !-----------------------------------------------
           real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda_m, mu_m,         &
             lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax1, dmax2,    &
-            qp1, qp2, gamma, cn1x, cn1y, cn1xy, cm1x, cm1y, cm1xy, cn2x, cn2y, & 
-            cn2xy, cm2x, cm2y, cm2xy
-          integer :: i, nlayer 
-          real(kind=WP), dimension(:), allocatable :: omega_x, omega_y, rho_x, &
-            rho_y, sigy
+            qp1, qp2, gamma, cm, cb
+          real(kind=WP), dimension(2) :: omega_x, omega_y, rho_x, rho_y, sigy
           integer :: ilaw
           logical :: is_available,is_encrypted
 !-----------------------------------------------
@@ -77,51 +74,36 @@
           call hm_option_is_encrypted(is_encrypted)
           !----------------------------------------------------------------------------------
           !< Density
-          call hm_get_floatv('MAT_RHO'          ,rho0   ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_RHO'          ,rho0      ,is_available,lsubmodel,unitab)
           !----------------------------------------------------------------------------------
           !< 1st line of material card
-          call hm_get_floatv('MAT_EC'           ,ec     ,is_available, lsubmodel, unitab)
-          call hm_get_floatv('MAT_NUC'          ,nuc    ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_EC'           ,ec        ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_NUC'          ,nuc       ,is_available,lsubmodel,unitab)
           !----------------------------------------------------------------------------------
           !< 2nd line of material card
-          call hm_get_floatv('MAT_FT'           ,f_t    ,is_available, lsubmodel, unitab)
-          call hm_get_floatv('MAT_FC'           ,f_c    ,is_available, lsubmodel, unitab)
-          call hm_get_floatv('MAT_GAMMA'        ,gamma  ,is_available, lsubmodel, unitab)
-          call hm_get_floatv('MAT_QP1'          ,qp1    ,is_available, lsubmodel, unitab)
-          call hm_get_floatv('MAT_QP2'          ,qp2    ,is_available, lsubmodel, unitab)
+          call hm_get_floatv('MAT_FT'           ,f_t       ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_FC'           ,f_c       ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_GAMMA'        ,gamma     ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_QP1'          ,qp1       ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_QP2'          ,qp2       ,is_available,lsubmodel,unitab)
           !----------------------------------------------------------------------------------
           !< 3rd line of material card
-          call hm_get_intv  ('NLAYER_REINF'     ,nlayer ,is_available, lsubmodel)
+          call hm_get_floatv('MAT_SIGY_INF'     ,sigy(1)   ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_OMEGA_X_INF'  ,omega_x(1),is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_OMEGA_Y_INF'  ,omega_y(1),is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_RHO_X_INF'    ,rho_x(1)  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_RHO_Y_INF'    ,rho_y(1)  ,is_available,lsubmodel,unitab)
           !----------------------------------------------------------------------------------
           !< 4th line of material card
-          allocate(sigy(nlayer),omega_x(nlayer),omega_y(nlayer),rho_x(nlayer),rho_y(nlayer))
-          do i = 1, nlayer
-            call hm_get_float_array_index('MAT_SIGY'   ,sigy(i)   ,i,is_available,lsubmodel,unitab)
-            call hm_get_float_array_index('MAT_OMEGA_X',omega_x(i),i,is_available,lsubmodel,unitab)
-            call hm_get_float_array_index('MAT_OMEGA_Y',omega_y(i),i,is_available,lsubmodel,unitab)
-            call hm_get_float_array_index('MAT_RHO_X'  ,rho_x(i)  ,i,is_available,lsubmodel,unitab)
-            call hm_get_float_array_index('MAT_RHO_Y'  ,rho_y(i)  ,i,is_available,lsubmodel,unitab)
-          enddo
+          call hm_get_floatv('MAT_SIGY_SUP'     ,sigy(2)   ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_OMEGA_X_SUP'  ,omega_x(2),is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_OMEGA_Y_SUP'  ,omega_y(2),is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_RHO_X_SUP'    ,rho_x(2)  ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_RHO_Y_SUP'    ,rho_y(2)  ,is_available,lsubmodel,unitab)
           !----------------------------------------------------------------------------------
           !< 5th line of material card
-          call hm_get_floatv('MAT_CN1X'         ,cn1x  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CN1Y'         ,cn1y  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CN1XY'        ,cn1xy ,is_available,lsubmodel,unitab)
-          !----------------------------------------------------------------------------------
-          !< 6th line of material card
-          call hm_get_floatv('MAT_CN2X'         ,cn2x  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CN2Y'         ,cn2y  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CN2XY'        ,cn2xy ,is_available,lsubmodel,unitab)
-          !-----------------------------------------------------------------------------------
-          !< 7th line of material card
-          call hm_get_floatv('MAT_CM1X'         ,cm1x  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CM1Y'         ,cm1y  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CM1XY'        ,cm1xy ,is_available,lsubmodel,unitab)
-          !----------------------------------------------------------------------------------
-          !< 8th line of material card
-          call hm_get_floatv('MAT_CM2X'         ,cm2x  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CM2Y'         ,cm2y  ,is_available,lsubmodel,unitab)
-          call hm_get_floatv('MAT_CM2XY'        ,cm2xy ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CM'           ,cm        ,is_available,lsubmodel,unitab)
+          call hm_get_floatv('MAT_CB'           ,cb        ,is_available,lsubmodel,unitab)
 !
           !----------------------------------------------------------------------------------
           !< Parameters default values
@@ -151,9 +133,9 @@
           !< Filling buffer tables
           !----------------------------------------------------------------------------------
           !< Number of integer material parameters
-          matparam%niparam = 1
+          matparam%niparam = 0
           !< Number of real material parameters
-          matparam%nuparam = 21 + 5*nlayer
+          matparam%nuparam = 21
           !< Number of user variables
           nuvar = 8
           !< Number of functions
@@ -166,9 +148,6 @@
           allocate(matparam%iparam(matparam%niparam))
           allocate(matparam%uparam(matparam%nuparam))
           allocate(matparam%table (matparam%ntable ))
-!
-          !< Integer material parameters
-          matparam%iparam(1)  = nlayer
 !
           !< Real material parameters
           matparam%young      = ec
@@ -184,25 +163,18 @@
           matparam%uparam(7)  = gamma
           matparam%uparam(8)  = dmax1
           matparam%uparam(9)  = dmax2
-          matparam%uparam(10) = cn1x
-          matparam%uparam(11) = cn1y
-          matparam%uparam(12) = cn1xy
-          matparam%uparam(13) = cn2x
-          matparam%uparam(14) = cn2y
-          matparam%uparam(15) = cn2xy
-          matparam%uparam(16) = cm1x
-          matparam%uparam(17) = cm1y
-          matparam%uparam(18) = cm1xy
-          matparam%uparam(19) = cm2x
-          matparam%uparam(20) = cm2y
-          matparam%uparam(21) = cm2xy
-          do i = 1, nlayer
-            matparam%uparam(21 + 5*(i-1) + 1) = sigy(i)
-            matparam%uparam(21 + 5*(i-1) + 2) = omega_x(i)
-            matparam%uparam(21 + 5*(i-1) + 3) = omega_y(i)
-            matparam%uparam(21 + 5*(i-1) + 4) = rho_x(i)
-            matparam%uparam(21 + 5*(i-1) + 5) = rho_y(i)
-          enddo
+          matparam%uparam(10) = sigy(1)
+          matparam%uparam(11) = omega_x(1)
+          matparam%uparam(12) = omega_y(1)
+          matparam%uparam(13) = rho_x(1)
+          matparam%uparam(14) = rho_y(1)
+          matparam%uparam(15) = sigy(2)
+          matparam%uparam(16) = omega_x(2)
+          matparam%uparam(17) = omega_y(2)
+          matparam%uparam(18) = rho_x(2)
+          matparam%uparam(19) = rho_y(2)
+          matparam%uparam(20) = cm
+          matparam%uparam(21) = cb
 !
           !< PARMAT table
           parmat(1)  = bulk
@@ -250,17 +222,11 @@
             write(iout,1002) rho0
             write(iout,1003) ec,nuc
             write(iout,1004) f_t,f_c,gamma,qp1,qp2,dmax1,dmax2
-            write(iout,1005) 
-            do i = 1,nlayer
-              write(iout,1006) i,sigy(i),omega_x(i),omega_y(i),rho_x(i),rho_y(i)
-            enddo
-            write(iout,1007) cn1x, cn1y, cm1x, cm1y, cm1xy
-            write(iout,1008) cn2x, cn2y, cm2x, cm2y, cm2xy
-            write(iout,1009)
+            write(iout,1005) sigy(1),omega_x(1),omega_y(1),rho_x(1),rho_y(1),      &
+                             sigy(2),omega_x(2),omega_y(2),rho_x(2),rho_y(2)
+            write(iout,1006) cm,cb
+            write(iout,1007)
           endif
-!
-          !< Array deallocation
-          deallocate(sigy,omega_x,omega_y,rho_x,rho_y)
 !
           !----------------------------------------------------------------------------------
           !< Output formats
@@ -283,38 +249,36 @@
 1004      format(/                                                                 &
             5X,"BENDING DAMAGE PARAMETERS:                              ",/,       &
             5X,"--------------------------                              ",/,       &
-            5X,"TENSILE STRENGTH (FT) . . . . . . . . . . . . . . . . .=",1PG20.13/&
-            5X,"COMPRESSIVE STRENGTH (FC) . . . . . . . . . . . . . . .=",1PG20.13/&
+            5X,"CONCRETE TENSILE STRENGTH (FT). . . . . . . . . . . . .=",1PG20.13/&
+            5X,"CONCRETE COMPRESSIVE STRENGTH (FC). . . . . . . . . . .=",1PG20.13/&
             5X,"DAMAGE SLOPE RATIO BEFORE/AFTER CRACKING (GAMMA). . . .=",1PG20.13/&
-            5X,"SLOPE QUOTIENT FOR POSITIVE BENDING (QP1) . . . . . . .=",1PG20.13/&
-            5X,"SLOPE QUOTIENT FOR NEGATIVE BENDING (QP2) . . . . . . .=",1PG20.13/&
+            5X,"SLOPE RATIO FOR POSITIVE BENDING (QP1). . . . . . . . .=",1PG20.13/&
+            5X,"SLOPE RATIO FOR NEGATIVE BENDING (QP2). . . . . . . . .=",1PG20.13/&
             5X,"MAXIMUM DAMAGE COMPUTED FOR POS. BENDING (DMAX1). . . .=",1PG20.13/&
             5X,"MAXIMUM DAMAGE COMPUTED FOR NEG. BENDING (DMAX2). . . .=",1PG20.13/)
 1005      format(/                                                                 &
             5X,"STEEL REINFORCEMENT GEOMETRIC PARAMETERS:               ",/,       &
-            5X,"-----------------------------------------               ",/)
-1006      format(/                                                                 &
-            5X,"REINFORCEMENT LAYER NO # ",I3/                                     &
+            5X,"-----------------------------------------               ",/,       &
+            5X,"                                                        ",/,       &
+            5X,"REINFORCEMENT OF LOWER LAYER                            ",/,       &
             5X,"STEEL YIELD STRESS (SIGY) . . . . . . . . . . . . . . .=",1PG20.13/&
             5X,"AREA OF THE REINFORCEMENT IN X DIRECTION (OMEGA_X). . .=",1PG20.13/&
             5X,"AREA OF THE REINFORCEMENT IN Y DIRECTION (OMEGA_Y). . .=",1PG20.13/&
             5X,"POSITION IN THICKNESS OF REINF. IN X DIRECTION (RHO_X).=",1PG20.13/&
+            5X,"POSITION IN THICKNESS OF REINF. IN Y DIRECTION (RHO_Y).=",1PG20.13/& 
+            5X,"                                                        ",/,       &
+            5X,"REINFORCEMENT OF UPPER LAYER                            ",/,       &
+            5X,"STEEL YIELD STRESS (SIGY) . . . . . . . . . . . . . . .=",1PG20.13/&
+            5X,"AREA OF THE REINFORCEMENT IN X DIRECTION (OMEGA_X). . .=",1PG20.13/&
+            5X,"AREA OF THE REINFORCEMENT IN  Y DIRECTION (OMEGA_Y) . .=",1PG20.13/&
+            5X,"POSITION IN THICKNESS OF REINF. IN X DIRECTION (RHO_X).=",1PG20.13/&
             5X,"POSITION IN THICKNESS OF REINF. IN Y DIRECTION (RHO_Y).=",1PG20.13/)
-1007      format(/                                                                 &
+1006      format(/                                                                 &
             5X,"STEEL REINFORCEMENT PLASTICITY PARAMETERS:              ",/,       &
             5X,"------------------------------------------              ",/,       &
-            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE BENDING (CN1X).=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE BENDING (CN1Y).=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE SHEAR (CM1X). .=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE SHEAR (CM1Y). .=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR COUPLING (CM1XY) . . . .=",1PG20.13/)
-1008      format(/                                                                 &
-            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE BENDING (CN2X).=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE BENDING (CN2Y).=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR POSITIVE SHEAR (CM2X). .=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR NEGATIVE SHEAR (CM2Y). .=",1PG20.13/&
-            5X,"PRAGER HARDENING PARAMETER FOR COUPLING (CM2XY) . . . .=",1PG20.13/)
-1009 format(/                                                                  &
+            5X,"PRAGER HARDENING PARAMETER FOR MEMBRANE FORCES (CM) . .=",1PG20.13/&
+            5X,"PRAGER HARDENING PARAMETER FOR BENDING MOMENTS (CB) . .=",1PG20.13/)
+1007 format(/                                                                  &
             5X,"========================================================",/)
 !
         end subroutine hm_read_mat136

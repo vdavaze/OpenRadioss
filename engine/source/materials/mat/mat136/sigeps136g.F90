@@ -81,11 +81,10 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i, iter, k, nlayer, ii, j, nindx, nindx2, nindx3,           &
-          indx(nel), indx2(nel), indx3(nel), ierr
+        integer :: i,k,ii,j,nindx,nindx2,nindx3,indx(nel),indx2(nel),          &
+          indx3(nel)
         real(kind=WP) :: young,nu,shear,lambda_m,mu_m,f_t,f_c,gamma,           &
-          dmax1,dmax2,Dm11,Dm12,Dm21,Dm22,cn1x,cn1y,cn1xy,cn2x,cn2y,cn2xy,     &
-          cm1x,cm1y,cm1xy,cm2x,cm2y,cm2xy
+          dmax1,dmax2,Dm11,Dm12,Dm21,Dm22,cm,cb
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
         real(kind=WP) :: center, radius, kappa1, kappa2, tr_kb, Y1,            &
           Y2,d1_trial,d2_trial,A11,A12,A22,dW1_dk1,dW1_dk2,dW2_dk1,            &
@@ -97,48 +96,38 @@
         real(kind=WP), dimension(nel) :: xi_tr, epbxx, epbyy, epbxy, xi_kap1,  &
           xi_kap2, Db11, Db12, Db21, Db22, Db33, mfx_pos, mfx_neg, mfy_pos,    &
           mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p
-        real(kind=WP), dimension(:), allocatable ::rho_x, rho_y, sig_y,        &
-          omega_x, omega_y
-        real(kind=WP), parameter :: tol = 1e-8
+        real(kind=WP), dimension(2) :: rho_x, rho_y, sig_y, omega_x, omega_y
+        real(kind=WP), parameter :: tol = 1e-3
+        real(kind=WP), parameter :: xi_pos = 1.0d0
+        real(kind=WP), parameter :: xi_neg = -1.0d0
 !
         !=======================================================================
         !< - Initialisation of computation on time step
         !=======================================================================
 !
-        !< Recover integer model parameters
-        nlayer   = matparam%iparam(1)                      !< Number of reinforcement layers
-        allocate(sig_y(nlayer),omega_x(nlayer),                                &
-          omega_y(nlayer),rho_x(nlayer),rho_y(nlayer))
         !< Recovering real model parameters
-        young    = matparam%young                          !< Concrete Young's modulus
-        nu       = matparam%nu                             !< Concrete Poisson's ratio
-        shear    = matparam%shear                          !< Concrete shear modulus
-        lambda_m = matparam%uparam(1)                      !< Membrane Lamé parameter
-        mu_m     = matparam%uparam(2)                      !< Membrane shear modulus
-        f_t      = matparam%uparam(5)                      !< Concrete Tensile strength
-        f_c      = matparam%uparam(6)                      !< Concrete Compressive strength
-        gamma    = matparam%uparam(7)                      !< Concrete 
-        dmax1    = matparam%uparam(8)                      !< Maximum damage for positive bending
-        dmax2    = matparam%uparam(9)                      !< Maximum damage for negative bending
-        cn1x     = matparam%uparam(10) 
-        cn1y     = matparam%uparam(11)
-        cn1xy    = matparam%uparam(12)
-        cn2x     = matparam%uparam(13)
-        cn2y     = matparam%uparam(14)
-        cn2xy    = matparam%uparam(15)
-        cm1x     = matparam%uparam(16)
-        cm1y     = matparam%uparam(17)
-        cm1xy    = matparam%uparam(18)
-        cm2x     = matparam%uparam(19)
-        cm2y     = matparam%uparam(20)
-        cm2xy    = matparam%uparam(21)
-        do k = 1,nlayer
-          sig_y(k)   = matparam%uparam(21 + 5*(k-1) + 1)   !< Yield stress of the steel reinforcement in layer k
-          omega_x(k) = matparam%uparam(21 + 5*(k-1) + 2)   !< Area of the steel reinforcement in x direction in layer k per unit length of concrete
-          omega_y(k) = matparam%uparam(21 + 5*(k-1) + 3)   !< Area of the steel reinforcement in y direction in layer k per unit length of concrete
-          rho_x(k)   = matparam%uparam(21 + 5*(k-1) + 4)   !< Through thickness position of the steel reinforcement in x direction in layer k (normalized by the initial thickness)
-          rho_y(k)   = matparam%uparam(21 + 5*(k-1) + 5)   !< Through thickness position of the steel reinforcement in y direction in layer k (normalized by the initial thickness)
-        enddo
+        young      = matparam%young           !< Concrete Young's modulus
+        nu         = matparam%nu              !< Concrete Poisson's ratio
+        shear      = matparam%shear           !< Concrete shear modulus
+        lambda_m   = matparam%uparam(1)       !< Membrane Lamé parameter
+        mu_m       = matparam%uparam(2)       !< Membrane shear modulus
+        f_t        = matparam%uparam(5)       !< Concrete Tensile strength
+        f_c        = matparam%uparam(6)       !< Concrete Compressive strength
+        gamma      = matparam%uparam(7)       !< Concrete 
+        dmax1      = matparam%uparam(8)       !< Maximum damage for positive bending
+        dmax2      = matparam%uparam(9)       !< Maximum damage for negative bending
+        sig_y(1)   = matparam%uparam(10)      !< Yield stress of the reinforcement in lower layer
+        omega_x(1) = matparam%uparam(11)      !< Reinforcement ratio in x direction for lower layer
+        omega_y(1) = matparam%uparam(12)      !< Reinforcement ratio in y direction for lower layer
+        rho_x(1)   = matparam%uparam(13)      !< Position in thickness of reinforcement in x direction for lower layer
+        rho_y(1)   = matparam%uparam(14)      !< Position in thickness of reinforcement in y direction for lower layer
+        sig_y(2)   = matparam%uparam(15)      !< Yield stress of the reinforcement in upper layer
+        omega_x(2) = matparam%uparam(16)      !< Reinforcement ratio in x direction for upper layer
+        omega_y(2) = matparam%uparam(17)      !< Reinforcement ratio in y direction for upper layer
+        rho_x(2)   = matparam%uparam(18)      !< Position in thickness of reinforcement in x direction for upper layer
+        rho_y(2)   = matparam%uparam(19)      !< Position in thickness of reinforcement in y direction for upper layer
+        cm         = matparam%uparam(20)      !< Prager hardening parameter for membrane forces
+        cb         = matparam%uparam(21)      !< Prager hardening parameter for bending moments
 !
         !< Computation of some real parameters
         Dm11 = lambda_m + two*mu_m                         !< Membrane stiffness D11 = lambda + 2*mu
@@ -169,10 +158,8 @@
         !< Loop over elements
         do i = 1, nel
           ! -> Membrane forces
-          signxx(i) = sigoxx(i) + lambda_m*(depsxx(i) + depsyy(i)) +         &
-                                                two*mu_m*depsxx(i)
-          signyy(i) = sigoyy(i) + lambda_m*(depsxx(i) + depsyy(i)) +         &
-                                                two*mu_m*depsyy(i)
+          signxx(i) = sigoxx(i) +  Dm11*depsxx(i) + Dm12*depsyy(i)                                      
+          signyy(i) = sigoyy(i) +  Dm21*depsxx(i) + Dm22*depsyy(i)
           signxy(i) = sigoxy(i) +  mu_m*depsxy(i)
           signyz(i) = sigoyz(i) + gs(i)*depsyz(i)
           signzx(i) = sigozx(i) + gs(i)*depszx(i)
@@ -346,11 +333,11 @@
         !< Loop over the elements
         do i = 1, nel
           !< Positive bending moment
-          call calc_M_pos(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,      &
-            mfx_pos(i), dmfx_pos(i))
+          call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
+            rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
           !< Negative bending moment
-          call calc_M_neg(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,      &
-            mfx_neg(i), dmfx_neg(i)) 
+          call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
+            rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))
         enddo
 !
         !< Critical moment for the plasticity criterion in bending for the 
@@ -358,11 +345,11 @@
         !-----------------------------------------------------------------------        
         do i = 1,nel
           !< Positive bending moment
-          call calc_M_pos(signyy(i), thk0(i), f_c, sig_y, omega_y, rho_y,      &
-            mfy_pos(i), dmfy_pos(i))
+          call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
+            rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
           !< Negative bending moment
-          call calc_M_neg(signyy(i), thk0(i), f_c, sig_y, omega_y, rho_y,      &
-            mfy_neg(i), dmfy_neg(i))
+          call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
+            rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))
         enddo
 !
         !=======================================================================
@@ -416,22 +403,22 @@
               dfII_dNy  =  (momnxx(i) - mfx_neg(i)) * dmfy_neg(i)
               !< Système 2x2 : [A]{lam} = {b}
               !< A_11 = (df_I/dN)^T(Dm+Cm)(df_I/dN) + (df_I/dM)^T(Db+Cb)(df_I/dM)
-              A11 = dfI_dNx*(dfI_dNx*(Dm11 + cn1x) + dfI_dNy*Dm12) +           &
-                    dfI_dNy*(dfI_dNx*Dm21 + dfI_dNy*(Dm22 + cn1x)) +           &
-                    dfI_dMx*(dfI_dMx*(Db11(i) + cm1x) + dfI_dMy*Db12(i)) +     &
-                    dfI_dMy*(dfI_dMx*Db21(i) + dfI_dMy*(Db22(i) + cm1x)) +     &
-                    dfI_dMxy*(dfI_dMxy*(Db33(i) + cm1x))
-              A12 = dfI_dNx*(dfII_dNx*(Dm11 + cn1x) + dfII_dNy*Dm12) +         &
-                    dfI_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cn1x)) +         &
-                    dfI_dMx*(dfII_dMx*(Db11(i) + cm1x) + dfII_dMy*Db12(i)) +   &
-                    dfI_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cm1x)) +   &
-                    dfI_dMxy*(dfII_dMxy*(Db33(i) + cm1x))
+              A11 = dfI_dNx*(dfI_dNx*(Dm11 + cm) + dfI_dNy*Dm12) +           &
+                    dfI_dNy*(dfI_dNx*Dm21 + dfI_dNy*(Dm22 + cm)) +           &
+                    dfI_dMx*(dfI_dMx*(Db11(i) + cb) + dfI_dMy*Db12(i)) +     &
+                    dfI_dMy*(dfI_dMx*Db21(i) + dfI_dMy*(Db22(i) + cb)) +     &
+                    dfI_dMxy*(dfI_dMxy*(Db33(i) + cb))
+              A12 = dfI_dNx*(dfII_dNx*(Dm11 + cm) + dfII_dNy*Dm12) +         &
+                    dfI_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cm)) +         &
+                    dfI_dMx*(dfII_dMx*(Db11(i) + cb) + dfII_dMy*Db12(i)) +   &
+                    dfI_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cb)) +   &
+                    dfI_dMxy*(dfII_dMxy*(Db33(i) + cb))
               A21 = A12
-              A22 = dfII_dNx*(dfII_dNx*(Dm11 + cn1x) + dfII_dNy*Dm12) +        &
-                    dfII_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cn1x)) +        &
-                    dfII_dMx*(dfII_dMx*(Db11(i) + cm1x) + dfII_dMy*Db12(i)) +  &
-                    dfII_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cm1x)) +  &
-                    dfII_dMxy*(dfII_dMxy*(Db33(i) + cm1x))
+              A22 = dfII_dNx*(dfII_dNx*(Dm11 + cm) + dfII_dNy*Dm12) +        &
+                    dfII_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cm)) +        &
+                    dfII_dMx*(dfII_dMx*(Db11(i) + cb) + dfII_dMy*Db12(i)) +  &
+                    dfII_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cb)) +  &
+                    dfII_dMxy*(dfII_dMxy*(Db33(i) + cb))
               !< Right-hand side of the system
               b1 = f1p(i) 
               b2 = f2p(i)
@@ -458,6 +445,7 @@
               uvar(i,8) = uvar(i,8) + dkp_xy
               !< Update equivalent plastic strain for output and post-processing
               pla(i)    = pla(i)    + lam_I + lam_II
+              pla(i)    = max(pla(i), zero)
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
               signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
@@ -472,11 +460,11 @@
               momnyy(i) = momnyy(i) + sigb(i,4)
               momnxy(i) = momnxy(i) + sigb(i,5)
               ! -> Update the back-stress variables with the new plastic strain increment
-              sigb(i,1) = sigb(i,1) + cn1x*depsp_x
-              sigb(i,2) = sigb(i,2) + cn1x*depsp_y
-              sigb(i,3) = sigb(i,3) + cm1x*dkp_x
-              sigb(i,4) = sigb(i,4) + cm1x*dkp_y
-              sigb(i,5) = sigb(i,5) + cm1x*dkp_xy
+              sigb(i,1) = sigb(i,1) + cm*depsp_x
+              sigb(i,2) = sigb(i,2) + cm*depsp_y
+              sigb(i,3) = sigb(i,3) + cb*dkp_x
+              sigb(i,4) = sigb(i,4) + cb*dkp_y
+              sigb(i,5) = sigb(i,5) + cb*dkp_xy
               ! -> Add the new back-stress contribution
               signxx(i) = signxx(i) - sigb(i,1)
               signyy(i) = signyy(i) - sigb(i,2)
@@ -485,17 +473,17 @@
               momnxy(i) = momnxy(i) - sigb(i,5)
               !< Update the limit moments for the plasticity criteria
               !< - Positive bending moment for the reinforcement in x direction
-              call calc_M_pos(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &
-                mfx_pos(i), dmfx_pos(i))
-              !< - Negative bending moment for the reinforcement in x direction
-              call calc_M_neg(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &
-                mfx_neg(i), dmfx_neg(i))
-              !< - Positive bending moment for the reinforcement in y direction
-              call calc_M_pos(signyy(i), thk0(i), f_c, sig_y, omega_y, rho_y,  &
-                mfy_pos(i), dmfy_pos(i))
-              !< - Negative bending moment for the reinforcement in y direction
-              call calc_M_neg(signyy(i), thk0(i), f_c, sig_y, omega_y, rho_y,  &
-                mfy_neg(i), dmfy_neg(i))         
+              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
+              !< Negative bending moment
+              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))
+              !< Positive bending moment
+              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
+              !< Negative bending moment
+              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))      
               !< Update the plasticity criteria
               f1p(i) = -(momnxx(i) - mfx_pos(i))*(momnyy(i) - mfy_pos(i)) +    &
                                                       momnxy(i)*momnxy(i)
@@ -520,15 +508,15 @@
               dfI_dNy  =  (momnxx(i) - mfx_pos(i)) * dmfy_pos(i)
               !< Dénominateur de lambda_p
               !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
-              den = dfI_dNx*((Dm11 + cn1x)*dfI_dNx + Dm12*dfI_dNy) +           & 
-                    dfI_dNy*(Dm21*dfI_dNx + (Dm22 + cn1x)*dfI_dNy) +           &
+              den = dfI_dNx*((Dm11 + cm)*dfI_dNx + Dm12*dfI_dNy) +           & 
+                    dfI_dNy*(Dm21*dfI_dNx + (Dm22 + cm)*dfI_dNy) +           &
               !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
-                    dfI_dMx*((Db11(i) + cm1x)*dfI_dMx + Db12(i)*dfI_dMy) +     &
-                    dfI_dMy*(Db21(i)*dfI_dMx + (Db22(i) + cm1x)*dfI_dMy) +     &
-                    dfI_dMxy*((Db33(i) + cm1x)*dfI_dMxy)
+                    dfI_dMx*((Db11(i) + cb)*dfI_dMx + Db12(i)*dfI_dMy) +     &
+                    dfI_dMy*(Db21(i)*dfI_dMx + (Db22(i) + cb)*dfI_dMy) +     &
+                    dfI_dMxy*((Db33(i) + cb)*dfI_dMxy)
               !< Plastic multiplier
               den = sign(max(abs(den),em20),den)      
-              lam_I = f1p(i) / den            
+              lam_I = f1p(i) / den
               !< Correction des déformations plastiques
               depsp_x   = lam_I * dfI_dNx
               depsp_y   = lam_I * dfI_dNy
@@ -543,6 +531,7 @@
               uvar(i,8) = uvar(i,8) + dkp_xy
               !< Update equivalent plastic strain for output and post-processing
               pla(i)    = pla(i)    + lam_I
+              pla(i)    = max(pla(i), zero)
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
               signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
@@ -557,11 +546,11 @@
               momnyy(i) = momnyy(i) + sigb(i,4)
               momnxy(i) = momnxy(i) + sigb(i,5)
               ! -> Update of the back-stress with the new plastic strain increment
-              sigb(i,1) = sigb(i,1) + cn1x*depsp_x
-              sigb(i,2) = sigb(i,2) + cn1x*depsp_y
-              sigb(i,3) = sigb(i,3) + cm1x*dkp_x
-              sigb(i,4) = sigb(i,4) + cm1x*dkp_y
-              sigb(i,5) = sigb(i,5) + cm1x*dkp_xy
+              sigb(i,1) = sigb(i,1) + cm*depsp_x
+              sigb(i,2) = sigb(i,2) + cm*depsp_y
+              sigb(i,3) = sigb(i,3) + cb*dkp_x
+              sigb(i,4) = sigb(i,4) + cb*dkp_y
+              sigb(i,5) = sigb(i,5) + cb*dkp_xy
               ! -> Re-apply the back-stress contribution to the updated trial stress
               signxx(i) = signxx(i) - sigb(i,1)
               signyy(i) = signyy(i) - sigb(i,2)
@@ -570,11 +559,11 @@
               momnxy(i) = momnxy(i) - sigb(i,5)
               !< Update the limit moments for the plasticity criteria
               !< - Positive bending moment for the reinforcement in x direction
-              call calc_M_pos(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &
-                mfx_pos(i), dmfx_pos(i))
+              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
               !< - Positive bending moment for the reinforcement in y direction
-              call calc_M_pos(signyy(i), thk0(i), f_c, sig_y, omega_y, rho_y,  &
-                mfy_pos(i), dmfy_pos(i))
+              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
               !< Update the plasticity criteria
               f1p(i) = -(momnxx(i) - mfx_pos(i))*(momnyy(i) - mfy_pos(i)) +    &
                                                       momnxy(i)*momnxy(i)
@@ -597,12 +586,12 @@
               dfII_dNy  =  (momnxx(i) - mfx_neg(i)) * dmfy_neg(i)
               !< Dénominateur de lambda_p
               !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
-              den = dfII_dNx*((Dm11 + cn1x)*dfII_dNx + Dm12*dfII_dNy) +        &
-                    dfII_dNy*(Dm21*dfII_dNx + (Dm22 + cn1x)*dfII_dNy) +        &
+              den = dfII_dNx*((Dm11 + cm)*dfII_dNx + Dm12*dfII_dNy) +        &
+                    dfII_dNy*(Dm21*dfII_dNx + (Dm22 + cm)*dfII_dNy) +        &
               !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
-                    dfII_dMx*((Db11(i) + cm1x)*dfII_dMx + Db12(i)*dfII_dMy) +  &
-                    dfII_dMy*(Db21(i)*dfII_dMx + (Db22(i) + cm1x)*dfII_dMy) +  &
-                    dfII_dMxy*((Db33(i) + cm1x)*dfII_dMxy)
+                    dfII_dMx*((Db11(i) + cb)*dfII_dMx + Db12(i)*dfII_dMy) +  &
+                    dfII_dMy*(Db21(i)*dfII_dMx + (Db22(i) + cb)*dfII_dMy) +  &
+                    dfII_dMxy*((Db33(i) + cb)*dfII_dMxy)
               !< Plastic multiplier
               den = sign(max(abs(den),em20),den)      
               lam_II = f2p(i) / den      
@@ -620,6 +609,7 @@
               uvar(i,8) = uvar(i,8) + dkp_xy
               !< Update equivalent plastic strain for output and post-processing
               pla(i)    = pla(i)    + lam_II
+              pla(i)    = max(pla(i), zero)
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
               signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
@@ -634,11 +624,11 @@
               momnyy(i) = momnyy(i) + sigb(i,4)
               momnxy(i) = momnxy(i) + sigb(i,5)
               ! -> Update of the back-stress with the new plastic strain increment
-              sigb(i,1) = sigb(i,1) + cn1x*depsp_x
-              sigb(i,2) = sigb(i,2) + cn1x*depsp_y
-              sigb(i,3) = sigb(i,3) + cm1x*dkp_x
-              sigb(i,4) = sigb(i,4) + cm1x*dkp_y
-              sigb(i,5) = sigb(i,5) + cm1x*dkp_xy
+              sigb(i,1) = sigb(i,1) + cm*depsp_x
+              sigb(i,2) = sigb(i,2) + cm*depsp_y
+              sigb(i,3) = sigb(i,3) + cb*dkp_x
+              sigb(i,4) = sigb(i,4) + cb*dkp_y
+              sigb(i,5) = sigb(i,5) + cb*dkp_xy
               ! -> Re-apply the back-stress contribution to the updated trial stress
               signxx(i) = signxx(i) - sigb(i,1)
               signyy(i) = signyy(i) - sigb(i,2)
@@ -647,11 +637,11 @@
               momnxy(i) = momnxy(i) - sigb(i,5)
               !< Update the limit moments for the plasticity criteria
               !< - Negative bending moment for the reinforcement in x direction
-              call calc_M_neg(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &
-                mfx_neg(i), dmfx_neg(i))
+              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))
               !< - Negative bending moment for the reinforcement in y direction
-              call calc_M_neg(signyy(i), thk0(i), f_c, sig_y, omega_y, rho_y,  &
-                mfy_neg(i), dmfy_neg(i))                        
+              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
+                rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))                        
               !< Update the plasticity criteria
               f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +    &
                                                       momnxy(i)*momnxy(i)
@@ -659,53 +649,121 @@
           enddo
         endif
 !
-        !< Deallocation of the extended reinforcement position tables
-        deallocate(sig_y, omega_x, omega_y, rho_x, rho_y)
-!
         !=======================================================================
         end subroutine sigeps136g
 !
         !=======================================================================
         !< Function to compute the value of N_pos for a given eta
         !=======================================================================
-        function N_pos(eta, coef_c, sig_y, omega_x, rho_x) result(N_val)
+        function calc_N(                                                       &
+            eta      ,thk0     ,f_c      ,sig_y    ,omega_x  ,omega_y  ,       &
+            rho_x    ,rho_y    ,alpha    ,xi       )                           & 
+            result(N_val)
+!----------------------------------------------------------------
+!   M o d u l e s
+!----------------------------------------------------------------
+          use precision_mod, only: WP
+          use constant_mod
+!----------------------------------------------------------------
+!   I m p l i c i t   T y p e s
+!----------------------------------------------------------------          
           implicit none
-          real(kind=8), intent(in) :: eta, coef_c
-          real(kind=8), intent(in) :: sig_y(2), omega_x(2), rho_x(2)
-          real(kind=8)             :: N_val
-          real(kind=8)             :: xi_inf, xi_sup
-        
-          ! sign continu : sign(1.d0, 0.d0) = +1 en Fortran => coherent avec thèse
-          if (abs(eta - rho_x(1)) < 1.0d-4) then
-            xi_inf = 0.0d0
+!----------------------------------------------------------------
+!  I n p u t   A r g u m e n t s
+!----------------------------------------------------------------
+          real(kind=WP), intent(in) :: eta        !< Position of the neutral axis (normalized by the thickness)
+          real(kind=WP), intent(in) :: thk0       !< Thickness of the section
+          real(kind=WP), intent(in) :: f_c        !< Concrete compressive strength
+          real(kind=WP), intent(in) :: sig_y(2)   !< Yield stress of the reinforcement 
+          real(kind=WP), intent(in) :: omega_x(2) !< Area of the reinforcement in x direction
+          real(kind=WP), intent(in) :: omega_y(2) !< Area of the reinforcement in y direction
+          real(kind=WP), intent(in) :: rho_x(2)   !< Position of the reinforcement in x direction (normalized by the thickness)
+          real(kind=WP), intent(in) :: rho_y(2)   !< Position of the reinforcement in y direction (normalized by the thickness)
+          real(kind=WP), intent(in) :: alpha      !< Angle of the reinforcement
+          real(kind=WP), intent(in) :: xi         !< +1 for positive bending, -1 for negative bending
+!----------------------------------------------------------------
+!  L o c a l  V a r i a b l e s
+!----------------------------------------------------------------
+          real(kind=WP)             :: N_val      !< Value of N for the given eta
+          real(kind=WP)             :: xi_inf_x   !< Sign for the reinforcement below the neutral axis in x direction
+          real(kind=WP)             :: xi_sup_x   !< Sign for the reinforcement above the neutral axis in x direction
+          real(kind=WP)             :: xi_inf_y   !< Sign for the reinforcement below the neutral axis in y direction
+          real(kind=WP)             :: xi_sup_y   !< Sign for the reinforcement above the neutral axis in y direction
+          real(kind=WP)             :: gamma_x    !< Contribution of the reinforcement in x direction to the bending resistance
+          real(kind=WP)             :: gamma_y    !< Contribution of the reinforcement in y direction to the bending resistance
+!
+          !< Computation of the sign of the reinforcement contribution depending 
+          !  on the position of the neutral axis
+          if (abs(eta - rho_x(1)) < em04) then
+            xi_inf_x = zero
           else
-            xi_inf = sign(1.0d0, eta - rho_x(1))
-          end if
-          if (abs(eta - rho_x(2)) < 1.0d-4) then
-            xi_sup = 0.0d0
+            xi_inf_x = sign(one, eta - rho_x(1))
+          endif
+          if (abs(eta - rho_x(2)) < em04) then
+            xi_sup_x = zero
           else
-            xi_sup = sign(1.0d0, eta - rho_x(2))
-          end if
-        
-          N_val = coef_c * (eta - 1.0d0)          &
-                + sig_y(1) * omega_x(1) * xi_inf &
-                + sig_y(2) * omega_x(2) * xi_sup
-        end function N_pos
+            xi_sup_x = sign(one, eta - rho_x(2))
+          endif
+          if (abs(eta - rho_y(1)) < em04) then
+            xi_inf_y = zero
+          else
+            xi_inf_y = sign(one, eta - rho_y(1))
+          endif
+          if (abs(eta - rho_y(2)) < em04) then
+            xi_sup_y = zero
+          else
+            xi_sup_y = sign(one, eta - rho_y(2))
+          endif     
+!
+          !< Computation of the contribution of the reinforcement to the bending resistance
+          gamma_x = (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))*sig_y(1)/      &
+                                                               (f_c*thk0)
+          gamma_y = (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))*sig_y(2)/      &
+                                                               (f_c*thk0)
+!
+          !< Computation of N for the given eta
+          N_val = xi*gamma_x*(cos(alpha))**2 + xi*gamma_y*(sin(alpha))**2 -    &
+                                                   (one - xi*eta)*half
+          N_val = N_val * f_c * thk0
+        end function calc_N
 !
         !=======================================================================
         !< Computation of pos. bending moment M_pos and its derivative w.r.t N
         !=======================================================================
-        subroutine calc_M_pos(sigma, thk0, f_c, sig_y, omega_x, rho_x, M_pos, dM_pos_dN)
+        subroutine calc_M(                                                     &
+          sigma    ,thk0     ,f_c      ,sig_y    ,omega_x  ,omega_y  ,rho_x   ,&
+          rho_y    ,alpha    ,xi       ,M_val    ,dM_dN    )
+!----------------------------------------------------------------
+!   M o d u l e s
+!----------------------------------------------------------------
           use precision_mod, only: WP
           use constant_mod
+!----------------------------------------------------------------
+!   I m p l i c i t   T y p e s
+!----------------------------------------------------------------
           implicit none
-          real(kind=WP), intent(in) :: sigma, thk0, f_c
-          real(kind=WP), intent(in) :: sig_y(2), omega_x(2), rho_x(2)
-          real(kind=WP), intent(out) :: M_pos, dM_pos_dN
-!
+!----------------------------------------------------------------
+!  I n p u t   A r g u m e n t s
+!----------------------------------------------------------------
+          real(kind=WP), intent(in) :: sigma       !< Membrane stress in the direction of the bending moment
+          real(kind=WP), intent(in) :: thk0        !< Thickness of the section
+          real(kind=WP), intent(in) :: f_c         !< Concrete compressive strength
+          real(kind=WP), intent(in) :: sig_y(2)    !< Yield stress of the reinforcement
+          real(kind=WP), intent(in) :: omega_x(2)  !< Area of the reinforcement in x direction
+          real(kind=WP), intent(in) :: omega_y(2)  !< Area of the reinforcement in y direction
+          real(kind=WP), intent(in) :: rho_x(2)    !< Position of the reinforcement in x direction (normalized by the thickness)
+          real(kind=WP), intent(in) :: rho_y(2)    !< Position of the reinforcement in y direction (normalized by the thickness)
+          real(kind=WP), intent(in) :: alpha       !< Angle of the reinforcement
+          real(kind=WP), intent(in) :: xi          !< +1 for positive bending, -1 for negative bending
+          real(kind=WP), intent(out) :: M_val      !< Value of the bending moment for the given sigma
+          real(kind=WP), intent(out) :: dM_dN      !< Derivative of the bending moment w.r.t. N for the given sigma
+!----------------------------------------------------------------
+!  L o c a l  V a r i a b l e s
+!----------------------------------------------------------------
           real(kind=WP) :: eta_lo, eta_hi, eta_mid
           real(kind=WP) :: N_lo, N_hi, N_mid, N
-          real(kind=WP) :: n_f, coef_c, xi_inf, xi_sup
+          real(kind=WP) :: n_f, xi_inf_x, xi_sup_x, xi_inf_y, xi_sup_y
+          real(kind=WP) :: gamma_x, gamma_y, rhox, rhoy
           integer :: iter
           logical :: found
           real(kind=WP), parameter :: tol = 1.0d-8   ! tolerance sur eta
@@ -714,151 +772,43 @@
           integer,       parameter :: max_iter = 100
 !
           n_f = zero
-          coef_c = thk0*f_c*half
-          N_lo = N_pos(eta_min, coef_c, sig_y, omega_x, rho_x)
-          N_hi = N_pos(eta_max, coef_c, sig_y, omega_x, rho_x)
+          N_lo = calc_N(eta_min,thk0,f_c,sig_y,omega_x,omega_y,rho_x,rho_y,alpha,xi)
+          N_hi = calc_N(eta_max,thk0,f_c,sig_y,omega_x,omega_y,rho_x,rho_y,alpha,xi)
           N = sigma*thk0
           found = .false.
           eta_mid = half * (eta_min + eta_max)
-          if (N < N_lo .or. N > N_hi) then
-            ! N hors domaine : on sature a la borne la plus proche
+!
+          !< Check if N is within the range of N(eta) for eta in [eta_min, eta_max]
+          if (N*xi < N_lo*xi .or. N*xi > N_hi*xi) then
             if (N < N_lo) then
               n_f = eta_min
             else
               n_f = eta_max
             end if
             found = .true.
-          end if
+          endif
 !
-          ! --- Bisection ---
+          !< Bisection to find the value of eta such that N(eta) = sigma*thk0
           eta_lo = eta_min
           eta_hi = eta_max
           if (.not.found) then
             do iter = 1, max_iter
               eta_mid = half * (eta_lo + eta_hi)
-              N_mid   = N_pos(eta_mid, coef_c, sig_y, omega_x, rho_x)
-          
+              N_mid   = calc_N(eta_mid,thk0,f_c,sig_y,omega_x,omega_y,rho_x,rho_y,alpha,xi)
+              !< Check convergence
               if (abs(N_mid - N) < tol * abs(N) + tol) then
                 n_f   = eta_mid
                 found = .true.
                 exit
               endif
-          
+              !< Check if the interval is too small
               if ((eta_hi - eta_lo) < tol) then
                 n_f   = eta_mid
                 found = .true.
                 exit
               endif
-          
-              ! Resserrer l'intervalle
-              if (N_mid < N) then
-                eta_lo = eta_mid
-              else
-                eta_hi = eta_mid
-              endif
-            enddo
-          endif
-!
-          ! Convergence atteinte apres max_iter (ne devrait pas arriver)
-          if (.not.found) then 
-            n_f = eta_mid
-            found = .true.
-            write(*,*) 'AVERTISSEMENT : bisection non convergee apres ', iter, ' iterations' 
-          endif     
-          M_pos = thk0*half*(-N*n_f + f_c*thk0*fourth*(n_f - one)**2           & 
-                             + sig_y(1)*omega_x(1)*abs(n_f - rho_x(1))         &
-                             + sig_y(2)*omega_x(2)*abs(n_f - rho_x(2)))
-          dM_pos_dN = - half* thk0 * n_f
-!
-        end subroutine calc_M_pos  
-!
-        !=======================================================================
-        !< Function to compute the value of N_neg for a given eta
-        !=======================================================================
-        function N_neg(eta, coef_c, sig_y, omega_x, rho_x) result(N_val)
-          implicit none
-          real(kind=8), intent(in) :: eta, coef_c
-          real(kind=8), intent(in) :: sig_y(2), omega_x(2), rho_x(2)
-          real(kind=8)             :: N_val
-          real(kind=8)             :: xi_inf, xi_sup
-        
-          ! sign continu : sign(1.d0, 0.d0) = +1 en Fortran => coherent avec thèse
-          if (abs(eta - rho_x(1)) < 1.0d-4) then
-            xi_inf = 0.0d0
-          else
-            xi_inf = sign(1.0d0, eta - rho_x(1))
-          end if
-          if (abs(eta - rho_x(2)) < 1.0d-4) then
-            xi_sup = 0.0d0
-          else
-            xi_sup = sign(1.0d0, eta - rho_x(2))
-          end if
-        
-          N_val = - coef_c * (eta + 1.0d0)                                     &
-                - sig_y(1) * omega_x(1) * xi_inf                               &
-                - sig_y(2) * omega_x(2) * xi_sup
-        end function N_neg
-!        
-        !=======================================================================
-        !< Computation of neg. bending moment M_neg and its derivative w.r.t N
-        !=======================================================================
-        subroutine calc_M_neg(sigma, thk0, f_c, sig_y, omega_x, rho_x, M_neg, dM_neg_dN)
-          use precision_mod, only: WP
-          use constant_mod
-          implicit none
-          real(kind=WP), intent(in) :: sigma, thk0, f_c
-          real(kind=WP), intent(in) :: sig_y(2), omega_x(2), rho_x(2)
-          real(kind=WP), intent(out) :: M_neg, dM_neg_dN
-!
-          real(kind=WP) :: eta_lo, eta_hi, eta_mid
-          real(kind=WP) :: N_lo, N_hi, N_mid, N
-          real(kind=WP) :: n_f, coef_c, xi_inf, xi_sup
-          integer :: iter
-          logical :: found
-          real(kind=WP), parameter :: tol = 1.0d-8   ! tolerance sur eta
-          real(kind=WP), parameter :: eta_min = -1.0d0
-          real(kind=WP), parameter :: eta_max = 1.0d0
-          integer,       parameter :: max_iter = 100
-!
-          n_f = zero
-          coef_c = thk0*f_c*half
-          N_lo = N_neg(eta_min, coef_c, sig_y, omega_x, rho_x)
-          N_hi = N_neg(eta_max, coef_c, sig_y, omega_x, rho_x)
-          N = sigma*thk0
-          found  = .false.
-          eta_mid = half * (eta_min + eta_max)
-          if (N > N_lo .or. N < N_hi) then
-            ! N hors domaine : on sature a la borne la plus proche
-            if (N > N_lo) then
-              n_f = eta_min
-            else
-              n_f = eta_max
-            endif
-            found = .true.
-          endif
-!
-          ! --- Bisection ---
-          eta_lo = eta_min
-          eta_hi = eta_max
-          if (.not.found) then
-            do iter = 1, max_iter
-              eta_mid = half * (eta_lo + eta_hi)
-              N_mid   = N_neg(eta_mid, coef_c, sig_y, omega_x, rho_x)
-          
-              if (abs(N_mid - N) < tol * abs(N) + tol) then
-                n_f   = eta_mid
-                found = .true.
-                exit
-              endif
-          
-              if ((eta_hi - eta_lo) < tol) then
-                n_f   = eta_mid
-                found = .true.
-                exit
-              endif
-          
-              ! Resserrer l'intervalle
-              if (N_mid > N) then
+              !< Narrow the interval
+              if (N_mid*xi < N*xi) then
                 eta_lo = eta_mid
               else
                 eta_hi = eta_mid
@@ -873,11 +823,48 @@
             write(*,*) 'AVERTISSEMENT : bisection non convergee apres ', iter, ' iterations' 
           endif     
 !
-          M_neg = -thk0*half*(N*n_f + f_c*thk0*fourth*(n_f + one)**2           & 
-                             + sig_y(1)*omega_x(1)*abs(n_f - rho_x(1))         &
-                             + sig_y(2)*omega_x(2)*abs(n_f - rho_x(2)))
-          dM_neg_dN = - half* thk0 * n_f
+          !< Computation of the sign of the reinforcement contribution depending 
+          !  on the position of the neutral axis
+          if (abs(n_f - rho_x(1)) < em04) then
+            xi_inf_x = zero
+          else
+            xi_inf_x = sign(one, n_f - rho_x(1))
+          endif
+          if (abs(n_f - rho_x(2)) < em04) then
+            xi_sup_x = zero
+          else
+            xi_sup_x = sign(one, n_f - rho_x(2))
+          endif
+          if (abs(n_f - rho_y(1)) < em04) then
+            xi_inf_y = zero
+          else
+            xi_inf_y = sign(one, n_f - rho_y(1))
+          endif
+          if (abs(n_f - rho_y(2)) < em04) then
+            xi_sup_y = zero
+          else            
+            xi_sup_y = sign(one, n_f - rho_y(2))
+          endif
 !
-        end subroutine calc_M_neg 
+          !< Computation of the contribution of the reinforcement to the bending resistance
+          gamma_x = (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))*sig_y(1)/(f_c*thk0)
+          gamma_y = (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))*sig_y(2)/(f_c*thk0)
+!
+          !< Computation of the position of the equivalent reinforcement for the concrete contribution
+          rhox = (xi_sup_x*omega_x(2)*rho_x(2) + xi_inf_x*omega_x(1)*rho_x(1)) /   &
+                 (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))
+          rhoy = (xi_sup_y*omega_y(2)*rho_y(2) + xi_inf_y*omega_y(1)*rho_y(1)) /   &
+                 (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))
+!
+          !< Computation of the bending moment for the given sigma
+          M_val = -half*xi*rhox*gamma_x*(cos(alpha))**2 -                      &
+                   half*xi*rhoy*gamma_y*(sin(alpha))**2 +                      &
+                   xi*fourth*(one - n_f**2)
+          M_val = M_val * f_c * thk0**2
+!
+          !< Computation of the derivative of the bending moment w.r.t. N for the given sigma
+          dM_dN = - thk0 * n_f
+!
+        end subroutine calc_M
 !
       end module sigeps136g_mod
