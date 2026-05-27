@@ -84,7 +84,7 @@
         integer :: i, iter, k, nlayer, ii, j, nindx, nindx2, nindx3,           &
           indx(nel), indx2(nel), indx3(nel), ierr
         real(kind=WP) :: young,nu,shear,lambda_m,mu_m,f_t,f_c,gamma,           &
-          dmax,Dm11,Dm12,Dm21,Dm22,cn1x,cn1y,cn1xy,cn2x,cn2y,cn2xy,            &
+          dmax1,dmax2,Dm11,Dm12,Dm21,Dm22,cn1x,cn1y,cn1xy,cn2x,cn2y,cn2xy,     &
           cm1x,cm1y,cm1xy,cm2x,cm2y,cm2xy
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
         real(kind=WP) :: center, radius, kappa1, kappa2, tr_kb, Y1,            &
@@ -96,8 +96,7 @@
           dfII_dNx,dfII_dNy,dfII_dMx,dfII_dMy,dfII_dMxy,lam_I,lam_II
         real(kind=WP), dimension(nel) :: xi_tr, epbxx, epbyy, epbxy, xi_kap1,  &
           xi_kap2, Db11, Db12, Db21, Db22, Db33, mfx_pos, mfx_neg, mfy_pos,    &
-          mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p, Db32,     &
-          Db31, Db13, Db23
+          mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p
         real(kind=WP), dimension(:), allocatable ::rho_x, rho_y, sig_y,        &
           omega_x, omega_y
         real(kind=WP), parameter :: tol = 1e-8
@@ -119,25 +118,26 @@
         f_t      = matparam%uparam(5)                      !< Concrete Tensile strength
         f_c      = matparam%uparam(6)                      !< Concrete Compressive strength
         gamma    = matparam%uparam(7)                      !< Concrete 
-        dmax     = matparam%uparam(8)                      !< Maximum damage
-        cn1x     = matparam%uparam(9) 
-        cn1y     = matparam%uparam(10)                     
-        cn1xy    = matparam%uparam(11)                     
-        cn2x     = matparam%uparam(12)
-        cn2y     = matparam%uparam(13)                     
-        cn2xy    = matparam%uparam(14)                     
-        cm1x     = matparam%uparam(15)
-        cm1y     = matparam%uparam(16)                     
-        cm1xy    = matparam%uparam(17)                     
-        cm2x     = matparam%uparam(18)
-        cm2y     = matparam%uparam(19)                    
-        cm2xy    = matparam%uparam(20)                     
+        dmax1    = matparam%uparam(8)                      !< Maximum damage for positive bending
+        dmax2    = matparam%uparam(9)                      !< Maximum damage for negative bending
+        cn1x     = matparam%uparam(10) 
+        cn1y     = matparam%uparam(11)
+        cn1xy    = matparam%uparam(12)
+        cn2x     = matparam%uparam(13)
+        cn2y     = matparam%uparam(14)
+        cn2xy    = matparam%uparam(15)
+        cm1x     = matparam%uparam(16)
+        cm1y     = matparam%uparam(17)
+        cm1xy    = matparam%uparam(18)
+        cm2x     = matparam%uparam(19)
+        cm2y     = matparam%uparam(20)
+        cm2xy    = matparam%uparam(21)
         do k = 1,nlayer
-          sig_y(k)   = matparam%uparam(20 + 5*(k-1) + 1)   !< Yield stress of the steel reinforcement in layer k
-          omega_x(k) = matparam%uparam(20 + 5*(k-1) + 2)   !< Area of the steel reinforcement in x direction in layer k per unit length of concrete
-          omega_y(k) = matparam%uparam(20 + 5*(k-1) + 3)   !< Area of the steel reinforcement in y direction in layer k per unit length of concrete
-          rho_x(k)   = matparam%uparam(20 + 5*(k-1) + 4)   !< Through thickness position of the steel reinforcement in x direction in layer k (normalized by the initial thickness)
-          rho_y(k)   = matparam%uparam(20 + 5*(k-1) + 5)   !< Through thickness position of the steel reinforcement in y direction in layer k (normalized by the initial thickness)
+          sig_y(k)   = matparam%uparam(21 + 5*(k-1) + 1)   !< Yield stress of the steel reinforcement in layer k
+          omega_x(k) = matparam%uparam(21 + 5*(k-1) + 2)   !< Area of the steel reinforcement in x direction in layer k per unit length of concrete
+          omega_y(k) = matparam%uparam(21 + 5*(k-1) + 3)   !< Area of the steel reinforcement in y direction in layer k per unit length of concrete
+          rho_x(k)   = matparam%uparam(21 + 5*(k-1) + 4)   !< Through thickness position of the steel reinforcement in x direction in layer k (normalized by the initial thickness)
+          rho_y(k)   = matparam%uparam(21 + 5*(k-1) + 5)   !< Through thickness position of the steel reinforcement in y direction in layer k (normalized by the initial thickness)
         enddo
 !
         !< Computation of some real parameters
@@ -158,9 +158,9 @@
           uvar(i,1) = uvar(i,1) + depbxx(i)
           uvar(i,2) = uvar(i,2) + depbyy(i)
           uvar(i,3) = uvar(i,3) + depbxy(i)
-          epbxx(i)  = uvar(i,1)
-          epbyy(i)  = uvar(i,2)
-          epbxy(i)  = uvar(i,3)
+          epbxx(i)  = uvar(i,1) - uvar(i,6)
+          epbyy(i)  = uvar(i,2) - uvar(i,7)
+          epbxy(i)  = uvar(i,3) - uvar(i,8)
         enddo
 !
         !=======================================================================
@@ -218,13 +218,13 @@
           ! --> Positive bending, inner face
           if (Y1 >= k0_1(i)) then
             d1_trial = sqrt(phi_b_pos / k0_1(i)) - one
-            d1_trial = max(zero, min(d1_trial, dmax))
+            d1_trial = max(zero, min(d1_trial, dmax1))
             dmg(i,2) = max(dmg(i,2), d1_trial)
           end if
           ! --> Negative bending, outer face
           if (Y2 >= k0_2(i)) then
             d2_trial = sqrt(phi_b_neg / k0_2(i)) - one
-            d2_trial = max(zero, min(d2_trial, dmax))
+            d2_trial = max(zero, min(d2_trial, dmax2))
             dmg(i,3) = max(dmg(i,3), d2_trial)
           end if
           !< Softening factor for the moment Mxx and Myy
@@ -317,12 +317,8 @@
           !< Only active if the damage criterion is active (loading)
           Db11(i) = Db11(i) + fac1*dW1_dkxx*dW1_dkxx + fac2*dW2_dkxx*dW2_dkxx
           Db12(i) = Db12(i) + fac1*dW1_dkxx*dW1_dkyy + fac2*dW2_dkxx*dW2_dkyy
-          Db13(i) = zero
           Db21(i) = Db12(i)
           Db22(i) = Db22(i) + fac1*dW1_dkyy*dW1_dkyy + fac2*dW2_dkyy*dW2_dkyy
-          Db23(i) = zero
-          Db31(i) = zero
-          Db32(i) = zero
           Db33(i) = Db33(i) + fac1*dW1_dkxy*dW1_dkxy + fac2*dW2_dkxy*dW2_dkxy
         enddo     
 !
@@ -420,22 +416,22 @@
               dfII_dNy  =  (momnxx(i) - mfx_neg(i)) * dmfy_neg(i)
               !< Système 2x2 : [A]{lam} = {b}
               !< A_11 = (df_I/dN)^T(Dm+Cm)(df_I/dN) + (df_I/dM)^T(Db+Cb)(df_I/dM)
-              A11 = dfI_dNx**2*Dm11 + two*dfI_dNx*dfI_dNy*Dm12                 &
-                  + dfI_dNy**2*Dm22                                            &
-                  + dfI_dMx**2*Db11(i) + two*dfI_dMx*dfI_dMy*Db12(i)           &
-                  + dfI_dMy**2*Db22(i) + dfI_dMxy**2*Db33(i)
-              A12 = dfI_dNx*dfII_dNx*Dm11                                      &
-                  + (dfI_dNx*dfII_dNy+dfI_dNy*dfII_dNx)*Dm12                   &
-                  + dfI_dNy*dfII_dNy*Dm22                                      &
-                  + dfI_dMx*dfII_dMx*Db11(i)                                   &
-                  + (dfI_dMx*dfII_dMy+dfI_dMy*dfII_dMx)*Db12(i)                &
-                  + dfI_dMy*dfII_dMy*Db22(i)                                   &
-                  + dfI_dMxy*dfII_dMxy*Db33(i)
+              A11 = dfI_dNx*(dfI_dNx*(Dm11 + cn1x) + dfI_dNy*Dm12) +           &
+                    dfI_dNy*(dfI_dNx*Dm21 + dfI_dNy*(Dm22 + cn1x)) +           &
+                    dfI_dMx*(dfI_dMx*(Db11(i) + cm1x) + dfI_dMy*Db12(i)) +     &
+                    dfI_dMy*(dfI_dMx*Db21(i) + dfI_dMy*(Db22(i) + cm1x)) +     &
+                    dfI_dMxy*(dfI_dMxy*(Db33(i) + cm1x))
+              A12 = dfI_dNx*(dfII_dNx*(Dm11 + cn1x) + dfII_dNy*Dm12) +         &
+                    dfI_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cn1x)) +         &
+                    dfI_dMx*(dfII_dMx*(Db11(i) + cm1x) + dfII_dMy*Db12(i)) +   &
+                    dfI_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cm1x)) +   &
+                    dfI_dMxy*(dfII_dMxy*(Db33(i) + cm1x))
               A21 = A12
-              A22 = dfII_dNx**2*Dm11 + two*dfII_dNx*dfII_dNy*Dm12              &
-                  + dfII_dNy**2*Dm22                                           &
-                  + dfII_dMx**2*Db11(i) + two*dfII_dMx*dfII_dMy*Db12(i)        &
-                  + dfII_dMy**2*Db22(i) + dfII_dMxy**2*Db33(i)
+              A22 = dfII_dNx*(dfII_dNx*(Dm11 + cn1x) + dfII_dNy*Dm12) +        &
+                    dfII_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cn1x)) +        &
+                    dfII_dMx*(dfII_dMx*(Db11(i) + cm1x) + dfII_dMy*Db12(i)) +  &
+                    dfII_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cm1x)) +  &
+                    dfII_dMxy*(dfII_dMxy*(Db33(i) + cm1x))
               !< Right-hand side of the system
               b1 = f1p(i) 
               b2 = f2p(i)
@@ -460,21 +456,33 @@
               uvar(i,6) = uvar(i,6) + dkp_x
               uvar(i,7) = uvar(i,7) + dkp_y
               uvar(i,8) = uvar(i,8) + dkp_xy
-             
               !< Update equivalent plastic strain for output and post-processing
               pla(i)    = pla(i)    + lam_I + lam_II
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
               signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
-              momnxx(i) = momnxx(i) - Db11(i)*dkp_x -                          &
-                                      Db12(i)*dkp_y -                          &
-                                      Db13(i)*dkp_xy
-              momnyy(i) = momnyy(i) - Db21(i)*dkp_x -                          &
-                                      Db22(i)*dkp_y -                          &
-                                      Db23(i)*dkp_xy
-              momnxy(i) = momnxy(i) - Db31(i)*dkp_x -                          &
-                                      Db32(i)*dkp_y -                          &
-                                      Db33(i)*dkp_xy
+              momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y
+              momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
+              momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
+              !< Update of the kinematic hardening variables
+              ! -> Remove the previous back-stress contribution
+              signxx(i) = signxx(i) + sigb(i,1)
+              signyy(i) = signyy(i) + sigb(i,2)
+              momnxx(i) = momnxx(i) + sigb(i,3)
+              momnyy(i) = momnyy(i) + sigb(i,4)
+              momnxy(i) = momnxy(i) + sigb(i,5)
+              ! -> Update the back-stress variables with the new plastic strain increment
+              sigb(i,1) = sigb(i,1) + cn1x*depsp_x
+              sigb(i,2) = sigb(i,2) + cn1x*depsp_y
+              sigb(i,3) = sigb(i,3) + cm1x*dkp_x
+              sigb(i,4) = sigb(i,4) + cm1x*dkp_y
+              sigb(i,5) = sigb(i,5) + cm1x*dkp_xy
+              ! -> Add the new back-stress contribution
+              signxx(i) = signxx(i) - sigb(i,1)
+              signyy(i) = signyy(i) - sigb(i,2)
+              momnxx(i) = momnxx(i) - sigb(i,3)
+              momnyy(i) = momnyy(i) - sigb(i,4)
+              momnxy(i) = momnxy(i) - sigb(i,5)
               !< Update the limit moments for the plasticity criteria
               !< - Positive bending moment for the reinforcement in x direction
               call calc_M_pos(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &
@@ -512,14 +520,12 @@
               dfI_dNy  =  (momnxx(i) - mfx_pos(i)) * dmfy_pos(i)
               !< Dénominateur de lambda_p
               !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
-              den = dfI_dNx**2 * Dm11                                          &
-                  + two*dfI_dNx*dfI_dNy*Dm12                                   &
-                  + dfI_dNy**2 * Dm22                                          &
+              den = dfI_dNx*((Dm11 + cn1x)*dfI_dNx + Dm12*dfI_dNy) +           & 
+                    dfI_dNy*(Dm21*dfI_dNx + (Dm22 + cn1x)*dfI_dNy) +           &
               !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
-                  + dfI_dMx**2  * Db11(i)                                      &
-                  + two*dfI_dMx*dfI_dMy*Db12(i)                                &
-                  + dfI_dMy**2  * Db22(i)                                      &
-                  + dfI_dMxy**2 * Db33(i)   
+                    dfI_dMx*((Db11(i) + cm1x)*dfI_dMx + Db12(i)*dfI_dMy) +     &
+                    dfI_dMy*(Db21(i)*dfI_dMx + (Db22(i) + cm1x)*dfI_dMy) +     &
+                    dfI_dMxy*((Db33(i) + cm1x)*dfI_dMxy)
               !< Plastic multiplier
               den = sign(max(abs(den),em20),den)      
               lam_I = f1p(i) / den            
@@ -540,15 +546,28 @@
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
               signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
-              momnxx(i) = momnxx(i) - Db11(i)*dkp_x -                          &
-                                      Db12(i)*dkp_y -                          &
-                                      Db13(i)*dkp_xy
-              momnyy(i) = momnyy(i) - Db21(i)*dkp_x -                          &
-                                      Db22(i)*dkp_y -                          &
-                                      Db23(i)*dkp_xy
-              momnxy(i) = momnxy(i) - Db31(i)*dkp_x -                          &
-                                      Db32(i)*dkp_y -                          &
-                                      Db33(i)*dkp_xy
+              momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y
+              momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
+              momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
+              !< Update kinematic hardening variables
+              ! -> Remove previous contribution of the back-stress to the trial stress
+              signxx(i) = signxx(i) + sigb(i,1)
+              signyy(i) = signyy(i) + sigb(i,2)
+              momnxx(i) = momnxx(i) + sigb(i,3)
+              momnyy(i) = momnyy(i) + sigb(i,4)
+              momnxy(i) = momnxy(i) + sigb(i,5)
+              ! -> Update of the back-stress with the new plastic strain increment
+              sigb(i,1) = sigb(i,1) + cn1x*depsp_x
+              sigb(i,2) = sigb(i,2) + cn1x*depsp_y
+              sigb(i,3) = sigb(i,3) + cm1x*dkp_x
+              sigb(i,4) = sigb(i,4) + cm1x*dkp_y
+              sigb(i,5) = sigb(i,5) + cm1x*dkp_xy
+              ! -> Re-apply the back-stress contribution to the updated trial stress
+              signxx(i) = signxx(i) - sigb(i,1)
+              signyy(i) = signyy(i) - sigb(i,2)
+              momnxx(i) = momnxx(i) - sigb(i,3)
+              momnyy(i) = momnyy(i) - sigb(i,4)
+              momnxy(i) = momnxy(i) - sigb(i,5)
               !< Update the limit moments for the plasticity criteria
               !< - Positive bending moment for the reinforcement in x direction
               call calc_M_pos(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &
@@ -578,14 +597,12 @@
               dfII_dNy  =  (momnxx(i) - mfx_neg(i)) * dmfy_neg(i)
               !< Dénominateur de lambda_p
               !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
-              den = dfII_dNx**2 * Dm11                                         &
-                  + two*dfII_dNx*dfII_dNy*Dm12                                 &
-                  + dfII_dNy**2 * Dm22                                         &
+              den = dfII_dNx*((Dm11 + cn1x)*dfII_dNx + Dm12*dfII_dNy) +        &
+                    dfII_dNy*(Dm21*dfII_dNx + (Dm22 + cn1x)*dfII_dNy) +        &
               !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
-                  + dfII_dMx**2  * Db11(i)                                     &
-                  + two*dfII_dMx*dfII_dMy*Db12(i)                              &
-                  + dfII_dMy**2  * Db22(i)                                     &
-                  + dfII_dMxy**2 * Db33(i)
+                    dfII_dMx*((Db11(i) + cm1x)*dfII_dMx + Db12(i)*dfII_dMy) +  &
+                    dfII_dMy*(Db21(i)*dfII_dMx + (Db22(i) + cm1x)*dfII_dMy) +  &
+                    dfII_dMxy*((Db33(i) + cm1x)*dfII_dMxy)
               !< Plastic multiplier
               den = sign(max(abs(den),em20),den)      
               lam_II = f2p(i) / den      
@@ -606,15 +623,28 @@
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
               signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
-              momnxx(i) = momnxx(i) - Db11(i)*dkp_x -                          &
-                                      Db12(i)*dkp_y -                          &
-                                      Db13(i)*dkp_xy
-              momnyy(i) = momnyy(i) - Db21(i)*dkp_x -                          &
-                                      Db22(i)*dkp_y -                          &
-                                      Db23(i)*dkp_xy
-              momnxy(i) = momnxy(i) - Db31(i)*dkp_x -                          &
-                                      Db32(i)*dkp_y -                          &
-                                      Db33(i)*dkp_xy
+              momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y 
+              momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
+              momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
+              !< Update kinematic hardening variables
+              ! -> Remove previous contribution of the back-stress to the trial stress
+              signxx(i) = signxx(i) + sigb(i,1)
+              signyy(i) = signyy(i) + sigb(i,2)
+              momnxx(i) = momnxx(i) + sigb(i,3)
+              momnyy(i) = momnyy(i) + sigb(i,4)
+              momnxy(i) = momnxy(i) + sigb(i,5)
+              ! -> Update of the back-stress with the new plastic strain increment
+              sigb(i,1) = sigb(i,1) + cn1x*depsp_x
+              sigb(i,2) = sigb(i,2) + cn1x*depsp_y
+              sigb(i,3) = sigb(i,3) + cm1x*dkp_x
+              sigb(i,4) = sigb(i,4) + cm1x*dkp_y
+              sigb(i,5) = sigb(i,5) + cm1x*dkp_xy
+              ! -> Re-apply the back-stress contribution to the updated trial stress
+              signxx(i) = signxx(i) - sigb(i,1)
+              signyy(i) = signyy(i) - sigb(i,2)
+              momnxx(i) = momnxx(i) - sigb(i,3)
+              momnyy(i) = momnyy(i) - sigb(i,4)
+              momnxy(i) = momnxy(i) - sigb(i,5)
               !< Update the limit moments for the plasticity criteria
               !< - Negative bending moment for the reinforcement in x direction
               call calc_M_neg(signxx(i), thk0(i), f_c, sig_y, omega_x, rho_x,  &

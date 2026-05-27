@@ -59,7 +59,7 @@
 !   L o c a l   V a r i a b l e s
 !-----------------------------------------------
           real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda_m, mu_m,         &
-            lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax,            &
+            lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax1, dmax2,    &
             qp1, qp2, gamma, cn1x, cn1y, cn1xy, cm1x, cm1y, cm1xy, cn2x, cn2y, & 
             cn2xy, cm2x, cm2y, cm2xy
           integer :: i, nlayer 
@@ -144,7 +144,8 @@
           !----------------------------------------------------------------------------------
           !< Damage constants
           !----------------------------------------------------------------------------------
-          dmax = (one - qp2/qp1)/(qp2/qp1 - gamma)
+          dmax1 = (one - qp1)/(qp1 - gamma)
+          dmax2 = (one - qp2)/(qp2 - gamma)
 !
           !----------------------------------------------------------------------------------
           !< Filling buffer tables
@@ -152,7 +153,7 @@
           !< Number of integer material parameters
           matparam%niparam = 1
           !< Number of real material parameters
-          matparam%nuparam = 20 + 5*nlayer
+          matparam%nuparam = 21 + 5*nlayer
           !< Number of user variables
           nuvar = 8
           !< Number of functions
@@ -181,25 +182,26 @@
           matparam%uparam(5)  = f_t
           matparam%uparam(6)  = f_c
           matparam%uparam(7)  = gamma
-          matparam%uparam(8)  = dmax
-          matparam%uparam(9)  = cn1x
-          matparam%uparam(10) = cn1y
-          matparam%uparam(11) = cn1xy
-          matparam%uparam(12) = cn2x
-          matparam%uparam(13) = cn2y
-          matparam%uparam(14) = cn2xy
-          matparam%uparam(15) = cm1x
-          matparam%uparam(16) = cm1y
-          matparam%uparam(17) = cm1xy
-          matparam%uparam(18) = cm2x
-          matparam%uparam(19) = cm2y
-          matparam%uparam(20) = cm2xy
+          matparam%uparam(8)  = dmax1
+          matparam%uparam(9)  = dmax2
+          matparam%uparam(10) = cn1x
+          matparam%uparam(11) = cn1y
+          matparam%uparam(12) = cn1xy
+          matparam%uparam(13) = cn2x
+          matparam%uparam(14) = cn2y
+          matparam%uparam(15) = cn2xy
+          matparam%uparam(16) = cm1x
+          matparam%uparam(17) = cm1y
+          matparam%uparam(18) = cm1xy
+          matparam%uparam(19) = cm2x
+          matparam%uparam(20) = cm2y
+          matparam%uparam(21) = cm2xy
           do i = 1, nlayer
-            matparam%uparam(20 + 5*(i-1) + 1) = sigy(i)
-            matparam%uparam(20 + 5*(i-1) + 2) = omega_x(i)
-            matparam%uparam(20 + 5*(i-1) + 3) = omega_y(i)
-            matparam%uparam(20 + 5*(i-1) + 4) = rho_x(i)
-            matparam%uparam(20 + 5*(i-1) + 5) = rho_y(i)
+            matparam%uparam(21 + 5*(i-1) + 1) = sigy(i)
+            matparam%uparam(21 + 5*(i-1) + 2) = omega_x(i)
+            matparam%uparam(21 + 5*(i-1) + 3) = omega_y(i)
+            matparam%uparam(21 + 5*(i-1) + 4) = rho_x(i)
+            matparam%uparam(21 + 5*(i-1) + 5) = rho_y(i)
           enddo
 !
           !< PARMAT table
@@ -247,7 +249,7 @@
           else
             write(iout,1002) rho0
             write(iout,1003) ec,nuc
-            write(iout,1004) f_t,f_c,gamma,qp1,qp2,dmax
+            write(iout,1004) f_t,f_c,gamma,qp1,qp2,dmax1,dmax2
             write(iout,1005) 
             do i = 1,nlayer
               write(iout,1006) i,sigy(i),omega_x(i),omega_y(i),rho_x(i),rho_y(i)
@@ -286,7 +288,8 @@
             5X,"DAMAGE SLOPE RATIO BEFORE/AFTER CRACKING (GAMMA). . . .=",1PG20.13/&
             5X,"SLOPE QUOTIENT FOR POSITIVE BENDING (QP1) . . . . . . .=",1PG20.13/&
             5X,"SLOPE QUOTIENT FOR NEGATIVE BENDING (QP2) . . . . . . .=",1PG20.13/&
-            5X,"MAXIMUM DAMAGE COMPUTED . . . . . . . . . . . . . . . .=",1PG20.13/)
+            5X,"MAXIMUM DAMAGE COMPUTED FOR POS. BENDING (DMAX1). . . .=",1PG20.13/&
+            5X,"MAXIMUM DAMAGE COMPUTED FOR NEG. BENDING (DMAX2). . . .=",1PG20.13/)
 1005      format(/                                                                 &
             5X,"STEEL REINFORCEMENT GEOMETRIC PARAMETERS:               ",/,       &
             5X,"-----------------------------------------               ",/)
