@@ -84,7 +84,7 @@
         integer :: i,k,ii,j,nindx,nindx2,nindx3,indx(nel),indx2(nel),          &
           indx3(nel)
         real(kind=WP) :: young,nu,shear,lambda_m,mu_m,f_t,f_c,gamma,           &
-          dmax1,dmax2,Dm11,Dm12,Dm21,Dm22,cm,cb
+          dmax1,dmax2,Dm11,Dm12,cm,cb
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
         real(kind=WP) :: center, radius, kappa1, kappa2, tr_kb, Y1,            &
           Y2,d1_trial,d2_trial,A11,A12,A22,dW1_dk1,dW1_dk2,dW2_dk1,            &
@@ -106,41 +106,41 @@
         !=======================================================================
 !
         !< Recovering real model parameters
-        young      = matparam%young           !< Concrete Young's modulus
-        nu         = matparam%nu              !< Concrete Poisson's ratio
-        shear      = matparam%shear           !< Concrete shear modulus
-        lambda_m   = matparam%uparam(1)       !< Membrane Lamé parameter
-        mu_m       = matparam%uparam(2)       !< Membrane shear modulus
-        f_t        = matparam%uparam(5)       !< Concrete Tensile strength
-        f_c        = matparam%uparam(6)       !< Concrete Compressive strength
-        gamma      = matparam%uparam(7)       !< Concrete 
-        dmax1      = matparam%uparam(8)       !< Maximum damage for positive bending
-        dmax2      = matparam%uparam(9)       !< Maximum damage for negative bending
-        sig_y(1)   = matparam%uparam(10)      !< Yield stress of the reinforcement in lower layer
-        omega_x(1) = matparam%uparam(11)      !< Reinforcement ratio in x direction for lower layer
-        omega_y(1) = matparam%uparam(12)      !< Reinforcement ratio in y direction for lower layer
-        rho_x(1)   = matparam%uparam(13)      !< Position in thickness of reinforcement in x direction for lower layer
-        rho_y(1)   = matparam%uparam(14)      !< Position in thickness of reinforcement in y direction for lower layer
-        sig_y(2)   = matparam%uparam(15)      !< Yield stress of the reinforcement in upper layer
-        omega_x(2) = matparam%uparam(16)      !< Reinforcement ratio in x direction for upper layer
-        omega_y(2) = matparam%uparam(17)      !< Reinforcement ratio in y direction for upper layer
-        rho_x(2)   = matparam%uparam(18)      !< Position in thickness of reinforcement in x direction for upper layer
-        rho_y(2)   = matparam%uparam(19)      !< Position in thickness of reinforcement in y direction for upper layer
-        cm         = matparam%uparam(20)      !< Prager hardening parameter for membrane forces
-        cb         = matparam%uparam(21)      !< Prager hardening parameter for bending moments
+        young      = matparam%young        !< Concrete Young's modulus
+        nu         = matparam%nu           !< Concrete Poisson's ratio
+        shear      = matparam%shear        !< Concrete shear modulus
+        lambda_m   = matparam%uparam(1)    !< Membrane Lamé parameter
+        mu_m       = matparam%uparam(2)    !< Membrane shear modulus
+        f_t        = matparam%uparam(3)    !< Concrete Tensile strength
+        f_c        = matparam%uparam(4)    !< Concrete Compressive strength
+        gamma      = matparam%uparam(5)    !< Concrete 
+        dmax1      = matparam%uparam(6)    !< Maximum damage for positive bending
+        dmax2      = matparam%uparam(7)    !< Maximum damage for negative bending
+        sig_y(1)   = matparam%uparam(8)    !< Yield stress of the reinforcement in lower layer
+        omega_x(1) = matparam%uparam(9)    !< Reinforcement ratio in x direction for lower layer
+        omega_y(1) = matparam%uparam(10)   !< Reinforcement ratio in y direction for lower layer
+        rho_x(1)   = matparam%uparam(11)   !< Position in thickness of reinforcement in x direction for lower layer
+        rho_y(1)   = matparam%uparam(12)   !< Position in thickness of reinforcement in y direction for lower layer
+        sig_y(2)   = matparam%uparam(13)   !< Yield stress of the reinforcement in upper layer
+        omega_x(2) = matparam%uparam(14)   !< Reinforcement ratio in x direction for upper layer
+        omega_y(2) = matparam%uparam(15)   !< Reinforcement ratio in y direction for upper layer
+        rho_x(2)   = matparam%uparam(16)   !< Position in thickness of reinforcement in x direction for upper layer
+        rho_y(2)   = matparam%uparam(17)   !< Position in thickness of reinforcement in y direction for upper layer
+        cm         = matparam%uparam(18)   !< Prager hardening parameter for membrane forces
+        cb         = matparam%uparam(19)   !< Prager hardening parameter for bending moments
 !
         !< Computation of some real parameters
         Dm11 = lambda_m + two*mu_m                         !< Membrane stiffness D11 = lambda + 2*mu
         Dm12 = lambda_m                                    !< Membrane stiffness D12 = lambda
-        Dm21 = Dm12                                        !< Membrane stiffness D21 = lambda
-        Dm22 = Dm11                                        !< Membrane stiffness D22 = lambda + 2*mu 
         gs(1:nel) = shear*shf(1:nel)                       !< Correction factor for transverse shear 
-        lambda_b(1:nel) = thk0(1:nel)*matparam%uparam(3)   !< Bending Lamé parameter
-        mu_b(1:nel) = thk0(1:nel)*matparam%uparam(4)       !< Bending shear modulus
-        k0_1(1:nel) = f_t*f_t*(one - nu*nu) / &            !< Bending damage threshold in positive bending (tension inner face)                  
-                      (six*young*thk0(1:nel)*thk0(1:nel)) 
-        k0_2(1:nel) = f_c*f_c*(one - nu*nu) / &            !< Bending damage threshold in negative bending (tension outer face)
-                      (six*young*thk0(1:nel)*thk0(1:nel)) 
+        lambda_b(1:nel) = lambda_m*thk0(1:nel)*thk0(1:nel)*one_over_12 !< Bending Lamé parameter
+        mu_b(1:nel) = mu_m*thk0(1:nel)*thk0(1:nel)*one_over_12         !< Bending shear modulus
+        !< Bending damage threshold in positive bending (tension inner face)   
+        k0_1(1:nel) = -(gamma-one)*half*(lambda_b(1:nel) + two*mu_b(1:nel))*   &
+                       ((two*f_t*(one - nu*nu))/(young*thk0(1:nel)))**2
+        !< Bending damage threshold in negative bending (tension outer face)
+        k0_2(1:nel) = -(gamma-one)*half*(lambda_b(1:nel) + two*mu_b(1:nel))*   &
+                       ((two*f_t*(one - nu*nu))/(young*thk0(1:nel)))**2
 !
         !< Recompute the bending curvature tensor at current time step
         do i = 1, nel
@@ -159,7 +159,7 @@
         do i = 1, nel
           ! -> Membrane forces
           signxx(i) = sigoxx(i) +  Dm11*depsxx(i) + Dm12*depsyy(i)                                      
-          signyy(i) = sigoyy(i) +  Dm21*depsxx(i) + Dm22*depsyy(i)
+          signyy(i) = sigoyy(i) +  Dm12*depsxx(i) + Dm11*depsyy(i)
           signxy(i) = sigoxy(i) +  mu_m*depsxy(i)
           signyz(i) = sigoyz(i) + gs(i)*depsyz(i)
           signzx(i) = sigozx(i) + gs(i)*depszx(i)
@@ -407,18 +407,18 @@
               !< Système 2x2 : [A]{lam} = {b}
               !< A_11 = (df_I/dN)^T(Dm+Cm)(df_I/dN) + (df_I/dM)^T(Db+Cb)(df_I/dM)
               A11 = dfI_dNx*(dfI_dNx*(Dm11 + cm) + dfI_dNy*Dm12) +           &
-                    dfI_dNy*(dfI_dNx*Dm21 + dfI_dNy*(Dm22 + cm)) +           &
+                    dfI_dNy*(dfI_dNx*Dm12 + dfI_dNy*(Dm11 + cm)) +           &
                     dfI_dMx*(dfI_dMx*(Db11(i) + cb) + dfI_dMy*Db12(i)) +     &
                     dfI_dMy*(dfI_dMx*Db21(i) + dfI_dMy*(Db22(i) + cb)) +     &
                     dfI_dMxy*(dfI_dMxy*(Db33(i) + cb))
               A12 = dfI_dNx*(dfII_dNx*(Dm11 + cm) + dfII_dNy*Dm12) +         &
-                    dfI_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cm)) +         &
+                    dfI_dNy*(dfII_dNx*Dm12 + dfII_dNy*(Dm11 + cm)) +         &
                     dfI_dMx*(dfII_dMx*(Db11(i) + cb) + dfII_dMy*Db12(i)) +   &
                     dfI_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cb)) +   &
                     dfI_dMxy*(dfII_dMxy*(Db33(i) + cb))
               A21 = A12
               A22 = dfII_dNx*(dfII_dNx*(Dm11 + cm) + dfII_dNy*Dm12) +        &
-                    dfII_dNy*(dfII_dNx*Dm21 + dfII_dNy*(Dm22 + cm)) +        &
+                    dfII_dNy*(dfII_dNx*Dm12 + dfII_dNy*(Dm11 + cm)) +        &
                     dfII_dMx*(dfII_dMx*(Db11(i) + cb) + dfII_dMy*Db12(i)) +  &
                     dfII_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cb)) +  &
                     dfII_dMxy*(dfII_dMxy*(Db33(i) + cb))
@@ -451,7 +451,7 @@
               pla(i)    = max(pla(i), zero)
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-              signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
+              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
               momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y
               momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
               momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
@@ -516,7 +516,7 @@
               !< Dénominateur de lambda_p
               !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
               den = dfI_dNx*((Dm11 + cm)*dfI_dNx + Dm12*dfI_dNy) +           & 
-                    dfI_dNy*(Dm21*dfI_dNx + (Dm22 + cm)*dfI_dNy) +           &
+                    dfI_dNy*(Dm12*dfI_dNx + (Dm11 + cm)*dfI_dNy) +           &
               !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
                     dfI_dMx*((Db11(i) + cb)*dfI_dMx + Db12(i)*dfI_dMy) +     &
                     dfI_dMy*(Db21(i)*dfI_dMx + (Db22(i) + cb)*dfI_dMy) +     &
@@ -541,7 +541,7 @@
               pla(i)    = max(pla(i), zero)
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-              signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
+              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
               momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y
               momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
               momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
@@ -596,7 +596,7 @@
               !< Dénominateur de lambda_p
               !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
               den = dfII_dNx*((Dm11 + cm)*dfII_dNx + Dm12*dfII_dNy) +        &
-                    dfII_dNy*(Dm21*dfII_dNx + (Dm22 + cm)*dfII_dNy) +        &
+                    dfII_dNy*(Dm12*dfII_dNx + (Dm11 + cm)*dfII_dNy) +        &
               !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
                     dfII_dMx*((Db11(i) + cb)*dfII_dMx + Db12(i)*dfII_dMy) +  &
                     dfII_dMy*(Db21(i)*dfII_dMx + (Db22(i) + cb)*dfII_dMy) +  &
@@ -621,7 +621,7 @@
               pla(i)    = max(pla(i), zero)
               !< Update of the membrane stresses and bending moments
               signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-              signyy(i) = signyy(i) - Dm21*depsp_x - Dm22*depsp_y
+              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
               momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y 
               momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
               momnxy(i) = momnxy(i) - Db33(i)*dkp_xy

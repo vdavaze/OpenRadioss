@@ -58,9 +58,8 @@
 !-----------------------------------------------
 !   L o c a l   V a r i a b l e s
 !-----------------------------------------------
-          real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda_m, mu_m,         &
-            lambda_b, mu_b, tshear, f_c, f_t, kfiss1, kfiss2, dmax1, dmax2,    &
-            qp1, qp2, gamma, cm, cb
+          real(kind=WP) :: ec, nuc, rho0, bulk, shear, lambda, mu,f_c, f_t,    &
+            kfiss1, kfiss2, dmax1, dmax2, qp1, qp2, gamma, cm, cb
           real(kind=WP), dimension(2) :: omega_x, omega_y, rho_x, rho_y, sigy
           integer :: ilaw
           logical :: is_available,is_encrypted
@@ -112,12 +111,9 @@
           !----------------------------------------------------------------------------------
           !< Elastic constants
           !----------------------------------------------------------------------------------
-          !< Membrane elastic parameters
-          lambda_m = ec*nuc/(one - nuc*nuc)
-          mu_m     = ec/(two*(one + nuc))
-          !< Bending elastic parameters
-          lambda_b = ec*nuc/(12.0d0*(one - nuc*nuc))
-          mu_b     = ec/(24.0d0*(one + nuc))
+          !< Lame constants
+          lambda   = ec*nuc/(one - nuc*nuc)
+          mu       = ec/(two*(one + nuc))
           !< Shear modulus
           shear    = ec/(two*(one + nuc))
           !< Bulk modulus
@@ -126,8 +122,8 @@
           !----------------------------------------------------------------------------------
           !< Damage constants
           !----------------------------------------------------------------------------------
-          dmax1 = (one - qp1)/(one - gamma)
-          dmax2 = (one - qp2)/(one - gamma)
+          dmax1 = (one - qp1)/(qp1 - gamma)
+          dmax2 = (one - qp2)/(qp2 - gamma)
 !
           !----------------------------------------------------------------------------------
           !< Filling buffer tables
@@ -135,7 +131,7 @@
           !< Number of integer material parameters
           matparam%niparam = 0
           !< Number of real material parameters
-          matparam%nuparam = 21
+          matparam%nuparam = 19
           !< Number of user variables
           nuvar = 8
           !< Number of functions
@@ -154,27 +150,25 @@
           matparam%nu         = nuc
           matparam%shear      = shear
           matparam%bulk       = bulk
-          matparam%uparam(1)  = lambda_m
-          matparam%uparam(2)  = mu_m
-          matparam%uparam(3)  = lambda_b
-          matparam%uparam(4)  = mu_b
-          matparam%uparam(5)  = f_t
-          matparam%uparam(6)  = f_c
-          matparam%uparam(7)  = gamma
-          matparam%uparam(8)  = dmax1
-          matparam%uparam(9)  = dmax2
-          matparam%uparam(10) = sigy(1)
-          matparam%uparam(11) = omega_x(1)
-          matparam%uparam(12) = omega_y(1)
-          matparam%uparam(13) = rho_x(1)
-          matparam%uparam(14) = rho_y(1)
-          matparam%uparam(15) = sigy(2)
-          matparam%uparam(16) = omega_x(2)
-          matparam%uparam(17) = omega_y(2)
-          matparam%uparam(18) = rho_x(2)
-          matparam%uparam(19) = rho_y(2)
-          matparam%uparam(20) = cm
-          matparam%uparam(21) = cb
+          matparam%uparam(1)  = lambda
+          matparam%uparam(2)  = mu
+          matparam%uparam(3)  = f_t
+          matparam%uparam(4)  = f_c
+          matparam%uparam(5)  = gamma
+          matparam%uparam(6)  = dmax1
+          matparam%uparam(7)  = dmax2
+          matparam%uparam(8)  = sigy(1)
+          matparam%uparam(9)  = omega_x(1)
+          matparam%uparam(10) = omega_y(1)
+          matparam%uparam(11) = rho_x(1)
+          matparam%uparam(12) = rho_y(1)
+          matparam%uparam(13) = sigy(2)
+          matparam%uparam(14) = omega_x(2)
+          matparam%uparam(15) = omega_y(2)
+          matparam%uparam(16) = rho_x(2)
+          matparam%uparam(17) = rho_y(2)
+          matparam%uparam(18) = cm
+          matparam%uparam(19) = cb
 !
           !< PARMAT table
           parmat(1)  = bulk
