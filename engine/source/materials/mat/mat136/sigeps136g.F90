@@ -82,7 +82,7 @@
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
         integer :: i,k,ii,j,nindx,nindx2,nindx3,indx(nel),indx2(nel),          &
-          indx3(nel)
+          indx3(nel), iter
         real(kind=WP) :: young,nu,shear,lambda_m,mu_m,f_t,f_c,gamma,           &
           dmax1,dmax2,Dm11,Dm12,cm,cb
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
@@ -100,6 +100,7 @@
         real(kind=WP), parameter :: tol = 1e-3
         real(kind=WP), parameter :: xi_pos = 1.0d0
         real(kind=WP), parameter :: xi_neg = -1.0d0
+        integer, parameter :: nmax = 100
 !
         !=======================================================================
         !< - Initialisation of computation on time step
@@ -390,8 +391,11 @@
         !-----------------------------------------------------------------------
         if (nindx > 0) then
           do ii = 1, nindx
+            iter = 0
             i = indx(ii)
-            do while (abs(f1p(i)) > tol .or. abs(f2p(i)) > tol)
+            do while ((abs(f1p(i)) > tol .or. abs(f2p(i)) > tol) .and.         &
+                      (iter < nmax))
+              iter = iter + 1
               !< Normal derivatives of the criteria f_I 
               dfI_dMx  = -(momnyy(i) - mfy_pos(i))
               dfI_dMy  = -(momnxx(i) - mfx_pos(i))
@@ -506,7 +510,9 @@
         if (nindx2 > 0) then
           do ii = 1, nindx2
             i = indx2(ii)
-            do while (abs(f1p(i)) > tol)
+            iter = 0
+            do while ((abs(f1p(i)) > tol) .and. (iter < nmax))
+              iter = iter + 1
               !< Normal derivatives of the criteria f_I 
               dfI_dMx  = -(momnyy(i) - mfy_pos(i))
               dfI_dMy  = -(momnxx(i) - mfx_pos(i))
@@ -586,7 +592,9 @@
         if (nindx3 > 0) then
           do ii = 1, nindx3
             i = indx3(ii)
-            do while (abs(f2p(i)) > tol)
+            iter = 0
+            do while ((abs(f2p(i)) > tol) .and. (iter < nmax))
+              iter = iter + 1
               !< Normal derivatives of the criteria f_II
               dfII_dMx  = -(momnyy(i) - mfy_neg(i))
               dfII_dMy  = -(momnxx(i) - mfx_neg(i))
@@ -736,10 +744,10 @@
           endif     
 !
           !< Computation of the contribution of the reinforcement to the bending resistance
-          gamma_x = (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))*sig_y(1)/      &
-                                                               (f_c*thk0)
-          gamma_y = (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))*sig_y(2)/      &
-                                                               (f_c*thk0)
+          gamma_x = (xi_sup_x*omega_x(2)*sig_y(2) +                            &
+                     xi_inf_x*omega_x(1)*sig_y(1)) / (f_c*thk0)
+          gamma_y = (xi_sup_y*omega_y(2)*sig_y(2) +                            &
+                     xi_inf_y*omega_y(1)*sig_y(1)) / (f_c*thk0)                                                               
 !
           !< Computation of N for the given eta
           N_val = xi*gamma_x*(cos(alpha))**2 + xi*gamma_y*(sin(alpha))**2 -    &
@@ -800,7 +808,7 @@
 !
           !< Check if N is within the range of N(eta) for eta in [eta_min, eta_max]
           if (N*xi < N_lo*xi .or. N*xi > N_hi*xi) then
-            if (N < N_lo) then
+            if (N*xi < N_lo*xi) then
               n_f = eta_min
             else
               n_f = eta_max
@@ -840,7 +848,6 @@
           if (.not.found) then 
             n_f = eta_mid
             found = .true.
-            write(*,*) 'AVERTISSEMENT : bisection non convergee apres ', iter, ' iterations' 
           endif     
 !
           !< Computation of the sign of the reinforcement contribution depending 
@@ -867,8 +874,10 @@
           endif
 !
           !< Computation of the contribution of the reinforcement to the bending resistance
-          gamma_x = (xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1))*sig_y(1)/(f_c*thk0)
-          gamma_y = (xi_sup_y*omega_y(2) + xi_inf_y*omega_y(1))*sig_y(2)/(f_c*thk0)
+          gamma_x = (xi_sup_x*omega_x(2)*sig_y(2) +                            &
+                     xi_inf_x*omega_x(1)*sig_y(1)) / (f_c*thk0)
+          gamma_y = (xi_sup_y*omega_y(2)*sig_y(2) +                            &
+                     xi_inf_y*omega_y(1)*sig_y(1)) / (f_c*thk0)    
 !
           !< Computation of the position of the equivalent reinforcement for the concrete contribution
           denom_x = xi_sup_x*omega_x(2) + xi_inf_x*omega_x(1)
