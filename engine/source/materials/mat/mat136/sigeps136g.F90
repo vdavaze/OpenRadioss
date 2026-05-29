@@ -134,8 +134,8 @@
         Dm11 = lambda_m + two*mu_m                         !< Membrane stiffness D11 = lambda + 2*mu
         Dm12 = lambda_m                                    !< Membrane stiffness D12 = lambda
         gs(1:nel) = shear*shf(1:nel)                       !< Correction factor for transverse shear 
-        lambda_b(1:nel) = lambda_m*thk0(1:nel)*thk0(1:nel)*one_over_12 !< Bending Lamé parameter
-        mu_b(1:nel) = mu_m*thk0(1:nel)*thk0(1:nel)*one_over_12         !< Bending shear modulus
+        lambda_b(1:nel) = lambda_m*thk0(1:nel)*one_over_12 !< Bending Lamé parameter
+        mu_b(1:nel) = mu_m*thk0(1:nel)*one_over_12         !< Bending shear modulus
         !< Bending damage threshold in positive bending (tension inner face)   
         k0_1(1:nel) = -(gamma-one)*half*(lambda_b(1:nel) + two*mu_b(1:nel))*   &
                        ((two*f_t*(one - nu*nu))/(young*thk0(1:nel)))**2
