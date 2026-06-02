@@ -30,7 +30,7 @@
         signxx ,signyy ,signxy  ,signyz  ,signzx ,                             &
         momnxx ,momnyy ,momnxy  ,                                              &
         ssp    ,et     ,gs      ,nuvar   ,uvar   ,                             &
-        shf    ,pla    ,sigb    )
+        shf    ,pla    ,sigb    ,area    )
 !----------------------------------------------------------------
 !   M o d u l e s
 !----------------------------------------------------------------
@@ -78,11 +78,11 @@
         real(kind=WP), dimension(nel), intent(in)    :: shf      !< Shear correction factor force coefficient
         real(kind=WP), dimension(nel), intent(inout) :: pla      !< Array of plastic strains for post-processing and output
         real(kind=WP), dimension(nel,5),intent(inout) :: sigb  !< Array of back stresses for post-processing and output
+        real(kind=WP), dimension(nel), intent(in)    :: area     !< Element area for post-processing and output
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,k,ii,j,nindx,nindx2,nindx3,indx(nel),indx2(nel),          &
-          indx3(nel), iter
+        integer :: i,ii,nindx,indx(nel)
         real(kind=WP) :: young,nu,shear,lambda_m,mu_m,f_t,f_c,gamma,           &
           dmax1,dmax2,Dm11,Dm12,cm,cb
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
@@ -90,14 +90,19 @@
           Y2,d1_trial,d2_trial,A11,A12,A22,dW1_dk1,dW1_dk2,dW2_dk1,            &
           dW2_dk2,dW1_dkxx,dW1_dkyy,dW1_dkxy,dW2_dkxx,dW2_dkyy,dW2_dkxy,       &
           fac1,fac2,A21,dkap1dkxx,dkap1dkyy,dkap1dkxy,dkap2dkxx,dkap2dkyy,     &
-          dkap2dkxy,phi_b_pos,phi_b_neg,b1,b2,den,depsp_x,depsp_y,dkp_x,       &
-          dkp_y,dkp_xy,det2,dfI_dNx,dfI_dNy,dfI_dMx,dfI_dMy,dfI_dMxy,          &
-          dfII_dNx,dfII_dNy,dfII_dMx,dfII_dMy,dfII_dMxy,lam_I,lam_II
+          dkap2dkxy,phi_b_pos,phi_b_neg,depsp_x,depsp_y,dkp_x,dkp_y,dkp_xy
         real(kind=WP), dimension(nel) :: xi_tr, epbxx, epbyy, epbxy, xi_kap1,  &
           xi_kap2, Db11, Db12, Db21, Db22, Db33, mfx_pos, mfx_neg, mfy_pos,    &
-          mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, f1p, f2p, g1p, g2p
+          mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, eps_soc, Mx_rb_I,   & 
+          My_rb_I, Mxy_rb_I, Mx_rb_II, My_rb_II, Mxy_rb_II
+        real(kind = WP) :: AB2, AP_dot_AB,Ax, Ay, Bx, By, coef, f_I_check,     &
+          f_II_check,Mx_apex_I,Mx_I_star,Mx_II_star,My_apex_I,My_I_star,       &
+          My_II_star, Mxy_apex_I,Mxy_I_star,Mxy_II_star,Mx_out,Mxy_out,My_out, &
+          Nx_out,Ny_out,p_I,q_I,p_II,q_II,p_I_star,q_I_star,p_II_star,         &
+          q_II_star,Px,Py,Pz,r_I,r_I_star,r_II,r_II_star,rho_I,rho_II,t,det,   &
+          c_membrane, c_bending, Db_eff, Le_approx
         real(kind=WP), dimension(2) :: rho_x, rho_y, sig_y, omega_x, omega_y
-        real(kind=WP), parameter :: tol = 1e-3
+        real(kind=WP), parameter :: tol = 1.0d-3
         real(kind=WP), parameter :: xi_pos = 1.0d0
         real(kind=WP), parameter :: xi_neg = -1.0d0
         integer, parameter :: nmax = 100
@@ -141,7 +146,7 @@
                        ((two*f_t*(one - nu*nu))/(young*thk0(1:nel)))**2
         !< Bending damage threshold in negative bending (tension outer face)
         k0_2(1:nel) = -(gamma-one)*half*(lambda_b(1:nel) + two*mu_b(1:nel))*   &
-                       ((two*f_t*(one - nu*nu))/(young*thk0(1:nel)))**2
+                       ((two*f_c*(one - nu*nu))/(young*thk0(1:nel)))**2
 !
         !< Recompute the bending curvature tensor at current time step
         do i = 1, nel
@@ -167,7 +172,11 @@
           ! -> Hourglass stabilization variable
           et(i) = one
           ! -> Sound speed
-          ssp(i) = sqrt((young/(one - nu*nu))/rho(i))
+          c_membrane = sqrt((young/(one - nu*nu))/rho(i))
+          Db_eff = lambda_b(i) + two*mu_b(i) + cb
+          Le_approx = sqrt(area(i))  ! à remplacer par sqrt(aire(i))
+          c_bending = pi * sqrt(Db_eff / (rho(i) * thk0(i))) / Le_approx
+          ssp(i) = max(c_membrane, c_bending)
         enddo
 !
         !=======================================================================
@@ -314,6 +323,7 @@
         !< - COMPUTATION OF THE LIMIT MOMENT FOR THE PLASTICITY CRITERIA
         !=======================================================================
         !< Add kinematic hardening contribution 
+        !-----------------------------------------------------------------------
         do i = 1, nel
           signxx(i) = signxx(i) - sigb(i,1)
           signyy(i) = signyy(i) - sigb(i,2)
@@ -322,353 +332,288 @@
           momnxy(i) = momnxy(i) - sigb(i,5)
         enddo 
 !
-        !< Reset tables
-        mfx_pos(1:nel) = zero
-        mfx_neg(1:nel) = zero
-        mfy_pos(1:nel) = zero
-        mfy_neg(1:nel) = zero
-!
-        !< Critical moment for the plasticity criterion in bending for the 
-        !  reinforcement in x direction
+        !< Critical moment for the plasticity criterion in bending
         !-----------------------------------------------------------------------
         !< Loop over the elements
         do i = 1, nel
-          !< Positive bending moment
+          !< Positive bending moment for the reinforcement in x direction
           call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
             rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
-          !< Negative bending moment
+          !< Negative bending moment for the reinforcement in x direction
           call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
-            rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))
-        enddo
-!
-        !< Critical moment for the plasticity criterion in bending for the 
-        !  reinforcement in y direction
-        !-----------------------------------------------------------------------        
-        do i = 1,nel
-          !< Positive bending moment
+            rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))       
+          !< Positive bending moment for the reinforcement in y direction
           call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
             rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
-          !< Negative bending moment
+          !< Negative bending moment for the reinforcement in y direction
           call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,       &
             rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))
         enddo
 !
         !=======================================================================
-        !< - COMPUTATION OF THE MEMBRANE-BENDING PLASTICITY
+        !< - COMPUTATION OF THE YIELD CRITERION
         !=======================================================================
+        nindx = 0
         !< Loop over elements
-        do i = 1, nel
-          !< Computation of the plasticity criteria
-          f1p(i) = -(momnxx(i) - mfx_pos(i))*(momnyy(i) - mfy_pos(i)) +        &
-                                                 momnxy(i)*momnxy(i)
-          f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +        &
-                                                 momnxy(i)*momnxy(i)
-          g1p(i) =   momnxx(i) - mfx_pos(i) + momnyy(i) - mfy_pos(i)
-          g2p(i) = -(momnxx(i) - mfx_neg(i) + momnyy(i) - mfy_neg(i))
-        enddo
-!
-        !< Index of the active criteria
-        nindx  = 0
-        nindx2 = 0
-        nindx3 = 0
-        do i = 1, nel
-          if ((f1p(i) > zero) .and. (f2p(i) > zero) .and.                      &
-              (g1p(i) > zero) .and. (g2p(i) > zero)) then
+        do i = 1,nel
+          !< Moment reduced by reinforcements contribution for positive bending
+          !  (limit moment for plasticity criterion)
+          Mx_rb_I(i)   = momnxx(i)  - mfx_pos(i)
+          My_rb_I(i)   = momnyy(i)  - mfy_pos(i)
+          Mxy_rb_I(i)  = momnxy(i) 
+          !< Moment reduced by reinforcements contribution for negative bending
+          Mx_rb_II(i)  = mfx_neg(i) - momnxx(i)
+          My_rb_II(i)  = mfy_neg(i) - momnyy(i)
+          Mxy_rb_II(i) = momnxy(i)
+          !< Tolerance for the plasticity criterion
+          eps_soc(i) = 1.0d-4
+          !< Check of the plasticity criterion for positive and negative bending
+          ! Note : f ≤ 0 and Mx_rb ≤ 0 and My_rb ≤ 0 to be in the elastic domain
+          if ( &
+            !< Cone I : surface violation
+            ((-Mx_rb_I(i)*My_rb_I(i) + momnxy(i)**2 > eps_soc(i)) .and.         &
+              Mx_rb_I(i) <= zero .and. My_rb_I(i) <= zero)                      &
+            .or.                                                                &
+            !< Cone I : dual cone (apex)
+            (Mx_rb_I(i) > zero .and. My_rb_I(i) > zero)                         &
+            .or.                                                                &
+            !< Cone II : surface violation
+            ((-Mx_rb_II(i)*My_rb_II(i) + momnxy(i)**2 > eps_soc(i)) .and.       &
+              Mx_rb_II(i) <= zero .and. My_rb_II(i) <= zero)                    &
+            .or.                                                                &
+            !< Cone II : dual cone (apex)
+            (Mx_rb_II(i) > zero .and. My_rb_II(i) > zero)                       &
+          ) then
             nindx = nindx + 1
             indx(nindx) = i
-          else if ((f1p(i) > zero) .and. (g1p(i) > zero)) then
-            nindx2 = nindx2 + 1
-            indx2(nindx2) = i
-          else if ((f2p(i) > zero) .and. (g2p(i) > zero)) then
-            nindx3 = nindx3 + 1
-            indx3(nindx3) = i
           endif
         enddo
 !
-        !-----------------------------------------------------------------------
-        !< Both criteria active : loop over the indices of the active criteria 
-        !  to compute the plastic correction
-        !-----------------------------------------------------------------------
+        !=======================================================================
+        !< - RETURN MAPPING ON THE SECOND-ORDER CONE (SOC)
+        !=======================================================================
         if (nindx > 0) then
+          !< Loop over the yielding elements
           do ii = 1, nindx
-            iter = 0
             i = indx(ii)
-            do while ((abs(f1p(i)) > tol .or. abs(f2p(i)) > tol) .and.         &
-                      (iter < nmax))
-              iter = iter + 1
-              !< Normal derivatives of the criteria f_I 
-              dfI_dMx  = -(momnyy(i) - mfy_pos(i))
-              dfI_dMy  = -(momnxx(i) - mfx_pos(i))
-              dfI_dMxy =  two * momnxy(i)
-              dfI_dNx  =  (momnyy(i) - mfy_pos(i)) * dmfx_pos(i)
-              dfI_dNy  =  (momnxx(i) - mfx_pos(i)) * dmfy_pos(i)
-              !< Normal derivatives of the criteria f_II
-              dfII_dMx  = -(momnyy(i) - mfy_neg(i))
-              dfII_dMy  = -(momnxx(i) - mfx_neg(i))
-              dfII_dMxy =  two * momnxy(i)
-              dfII_dNx  =  (momnyy(i) - mfy_neg(i)) * dmfx_neg(i)
-              dfII_dNy  =  (momnxx(i) - mfx_neg(i)) * dmfy_neg(i)
-              !< Système 2x2 : [A]{lam} = {b}
-              !< A_11 = (df_I/dN)^T(Dm+Cm)(df_I/dN) + (df_I/dM)^T(Db+Cb)(df_I/dM)
-              A11 = dfI_dNx*(dfI_dNx*(Dm11 + cm) + dfI_dNy*Dm12) +           &
-                    dfI_dNy*(dfI_dNx*Dm12 + dfI_dNy*(Dm11 + cm)) +           &
-                    dfI_dMx*(dfI_dMx*(Db11(i) + cb) + dfI_dMy*Db12(i)) +     &
-                    dfI_dMy*(dfI_dMx*Db21(i) + dfI_dMy*(Db22(i) + cb)) +     &
-                    dfI_dMxy*(dfI_dMxy*(Db33(i) + cb))
-              A12 = dfI_dNx*(dfII_dNx*(Dm11 + cm) + dfII_dNy*Dm12) +         &
-                    dfI_dNy*(dfII_dNx*Dm12 + dfII_dNy*(Dm11 + cm)) +         &
-                    dfI_dMx*(dfII_dMx*(Db11(i) + cb) + dfII_dMy*Db12(i)) +   &
-                    dfI_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cb)) +   &
-                    dfI_dMxy*(dfII_dMxy*(Db33(i) + cb))
-              A21 = A12
-              A22 = dfII_dNx*(dfII_dNx*(Dm11 + cm) + dfII_dNy*Dm12) +        &
-                    dfII_dNy*(dfII_dNx*Dm12 + dfII_dNy*(Dm11 + cm)) +        &
-                    dfII_dMx*(dfII_dMx*(Db11(i) + cb) + dfII_dMy*Db12(i)) +  &
-                    dfII_dMy*(dfII_dMx*Db21(i) + dfII_dMy*(Db22(i) + cb)) +  &
-                    dfII_dMxy*(dfII_dMxy*(Db33(i) + cb))
-              !< Right-hand side of the system
-              b1 = f1p(i) 
-              b2 = f2p(i)
-              !< Compute inverse of A, and lambda_I, lambda_II
-              det2  = A11*A22 - A12*A21
-              if (abs(det2) < em20) then
-                lam_I  = b1 / max(A11, em20)
-                lam_II = zero
+!
+            !-------------------------------------------------------------------
+            !< Change of variables to express the criterion in the form of a SOC
+            !-------------------------------------------------------------------
+            !
+            ! Transformation : (Mx_rb, My_rb, Mxy) → (p, q, r)
+            !   p = (Mx_rb + My_rb) / 2   ← cone axis (must be ≤ 0)
+            !   q = (Mx_rb - My_rb) / 2   ← 1st transverse component
+            !   r = Mxy                   ← 2nd transverse component
+            !
+            ! Johansen's cone becomes : sqrt(q²+r²) ≤ -p, p ≤ 0
+            !=======================================================================
+            !< SOC coordinates for positive bending criterion f_I
+            p_I = half * (Mx_rb_I(i)  + My_rb_I(i))
+            q_I = half * (Mx_rb_I(i)  - My_rb_I(i))
+            r_I = momnxy(i)
+            !< SOC coordinates for negative bending criterion f_II
+            p_II = half * (Mx_rb_II(i) + My_rb_II(i))
+            q_II = half * (Mx_rb_II(i) - My_rb_II(i))
+            r_II = momnxy(i)
+            !< Transverse norms
+            rho_I  = sqrt(q_I**2  + r_I**2)
+            rho_II = sqrt(q_II**2 + r_II**2)
+
+            ! write(*,*) "Element ", i, " is yielding. Return mapping on SOC in progress..."
+            ! write(*,*) "signxx, signyy, momnxx, momnyy, momnxy = ", signxx(i), signyy(i), momnxx(i), momnyy(i), momnxy(i)
+            ! write(*,*) "p_I, q_I, r_I = ", p_I, q_I, r_I
+            ! write(*,*) "p_II, q_II, r_II = ", p_II, q_II, r_II
+            ! write(*,*) "rho_I, rho_II = ", rho_I, rho_II
+            ! write(*,*) "mfx_pos, mfy_pos = ", mfx_pos(i), mfy_pos(i)
+            ! write(*,*) "mfx_neg, mfy_neg = ", mfx_neg(i), mfy_neg(i)
+            ! write(*,*) "sigb(i,1), sigb(i,2), sigb(i,3), sigb(i,4), sigb(i,5) = ", &
+            !   sigb(i,1), sigb(i,2), sigb(i,3), sigb(i,4), sigb(i,5)
+            ! write(*,*) "Mx_rb_I, My_rb_I, Mxy_rb_I = ", Mx_rb_I(i), My_rb_I(i), Mxy_rb_I(i)
+            ! write(*,*) "Mx_rb_II, My_rb_II, Mxy_rb_II = ", Mx_rb_II(i), My_rb_II(i), Mxy_rb_II(i)
+            ! pause
+!
+            !-------------------------------------------------------------------
+            !< Projection on the SOC of positive bending criterion f_I 
+            !-------------------------------------------------------------------
+            ! write(*,*) "Projection on SOC for positive bending criterion f_I"
+            ! -> Case A : Already inside the cone → identity
+            if (rho_I <= -p_I + eps_soc(i)) then
+              p_I_star = p_I
+              q_I_star = q_I
+              r_I_star = r_I
+              ! write(*,*) "Case A : already inside the cone, no projection needed."
+            ! -> Case B : Inside the dual cone → apex
+            elseif (p_I >= zero .and. rho_I <= p_I + eps_soc(i)) then
+              p_I_star = zero
+              q_I_star = zero
+              r_I_star = zero
+              ! write(*,*) "Case B : inside the dual cone, projection on the apex."
+            ! -> Case C : General case → projection on the cone surface
+            else
+              coef = half*(one - p_I/rho_I)  
+              p_I_star = -coef * rho_I
+              q_I_star =  coef * q_I
+              r_I_star =  coef * r_I
+              ! write(*,*) "Case C : general case, projection on the cone surface."
+            endif
+            ! write(*,*) "Projected SOC coordinates for f_I : p_I_star, q_I_star, r_I_star = ", &
+             ! p_I_star, q_I_star, r_I_star
+!
+            !-------------------------------------------------------------------
+            !< Projection on the SOC of negative bending criterion f_II
+            !-------------------------------------------------------------------
+            ! write(*,*) "Projection on SOC for negative bending criterion f_II"
+            !< Case A : Already inside the cone → identity
+            if (rho_II <= -p_II + eps_soc(i)) then
+              p_II_star = p_II
+              q_II_star = q_II
+              r_II_star = r_II
+              ! write(*,*) "Case A : already inside the cone, no projection needed."
+            !< Case B : Inside the dual cone → apex
+            elseif (p_II >= zero .and. rho_II <= p_II + eps_soc(i)) then
+              p_II_star = zero
+              q_II_star = zero
+              r_II_star = zero
+              ! write(*,*) "Case B : inside the dual cone, projection on the apex."
+            !< Case C : General case → projection on the cone surface
+            else
+              coef  = half*(one - p_II/rho_II)
+              p_II_star = -coef * rho_II
+              q_II_star =  coef * q_II
+              r_II_star =  coef * r_II
+              ! write(*,*) "Case C : general case, projection on the cone surface."
+            endif
+            ! write(*,*) "Projected SOC coordinates for f_II : p_II_star, q_II_star, r_II_star = ", &
+             ! p_II_star, q_II_star, r_II_star
+            ! pause
+!
+            !-------------------------------------------------------------------
+            !< Return to physical variables
+            !------------------------------------------------------------------- 
+            !< For positive bending criterion f_I        
+            Mx_I_star  = p_I_star  + q_I_star  + mfx_pos(i)
+            My_I_star  = p_I_star  - q_I_star  + mfy_pos(i)
+            Mxy_I_star = r_I_star
+            !< For negative bending criterion f_II
+            Mx_II_star  = mfx_neg(i) - p_II_star - q_II_star
+            My_II_star  = mfy_neg(i) - p_II_star + q_II_star
+            Mxy_II_star = r_II_star
+!
+            !-------------------------------------------------------------------
+            ! Selection of the active set of constraints and final projection
+            ! Logic :
+            !   - Project on f_I and check if f_II is satisfied
+            !   - Project on f_II and check if f_I is satisfied
+            !   - If both are violated → projection on the intersection
+            !-------------------------------------------------------------------
+            f_II_check = -(Mx_I_star  - mfx_neg(i))*(My_I_star  - mfy_neg(i)) + Mxy_I_star**2
+            f_I_check  = -(Mx_II_star - mfx_pos(i))*(My_II_star - mfy_pos(i)) + Mxy_II_star**2
+            if (f_II_check <= eps_soc(i)) then
+              !< Projection on f_I only, f_II is already satisfied
+              Mx_out  = Mx_I_star
+              My_out  = My_I_star
+              Mxy_out = Mxy_I_star
+            elseif (f_I_check <= eps_soc(i)) then
+              !< Projection on f_II only, f_I is already satisfied
+              Mx_out  = Mx_II_star
+              My_out  = My_II_star
+              Mxy_out = Mxy_II_star
+            else
+              !< Both criteria are active → projection on the intersection
+              ! The intersection of two convex SOCs is convex
+              ! → analytical projection on the common edge
+              !--------------------------------------------------------------------
+              ! The apexes of the two cones in the physical space:
+              !   Apex of f_I  : (Mx=Mfxp+bx, My=Mfyp+by, Mxy=0)
+              !   Apex of f_II : (Mx=Mfxn+bx, My=Mfyn+by, Mxy=0)
+              !
+              ! The projection on the intersection is the convex combination
+              ! of the two apexes that minimizes the distance to the trial point.
+              ! It's a 1D analytical problem in the parameter t ∈ [0,1].
+              !--------------------------------------------------------------------
+              ! Projection of the trial point onto the segment [apex_I, apex_II]
+              ! (Mxy=0 along the entire edge)
+              Ax = mfx_pos(i)
+              Ay = mfy_pos(i)
+              Bx = mfx_neg(i)
+              By = mfy_neg(i)
+              Px = momnxx(i)
+              Py = momnyy(i)
+              Pz = momnxy(i)
+              AB2 = (Bx-Ax)**2 + (By-Ay)**2
+              if (AB2 < em20) then
+                ! Degenerate segment → projection = A
+                t = zero
               else
-                lam_I  = (b1*A22 - b2*A12) / det2
-                lam_II = (A11*b2 - A21*b1) / det2
+                AP_dot_AB = (Px-Ax)*(Bx-Ax) + (Py-Ay)*(By-Ay)
+                t = AP_dot_AB / AB2
+                t = max(zero, min(one, t))  ! clamp sur [0,1]
               endif
-              !< Compute the iteration plastic strain increment 
-              depsp_x = lam_I*dfI_dNx  + lam_II*dfII_dNx
-              depsp_y = lam_I*dfI_dNy  + lam_II*dfII_dNy
-              dkp_x   = lam_I*dfI_dMx  + lam_II*dfII_dMx
-              dkp_y   = lam_I*dfI_dMy  + lam_II*dfII_dMy
-              dkp_xy  = lam_I*dfI_dMxy + lam_II*dfII_dMxy
-              !< Update integrated plastic strains for post-processing and output
-              uvar(i,4) = uvar(i,4) + depsp_x
-              uvar(i,5) = uvar(i,5) + depsp_y
-              uvar(i,6) = uvar(i,6) + dkp_x
-              uvar(i,7) = uvar(i,7) + dkp_y
-              uvar(i,8) = uvar(i,8) + dkp_xy
-              !< Update equivalent plastic strain for output and post-processing
-              pla(i)    = pla(i)    + lam_I + lam_II
-              pla(i)    = max(pla(i), zero)
-              !< Update of the membrane stresses and bending moments
-              signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
-              momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y
-              momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
-              momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
-              !< Update of the kinematic hardening variables
-              ! -> Remove the previous back-stress contribution
-              signxx(i) = signxx(i) + sigb(i,1)
-              signyy(i) = signyy(i) + sigb(i,2)
-              momnxx(i) = momnxx(i) + sigb(i,3)
-              momnyy(i) = momnyy(i) + sigb(i,4)
-              momnxy(i) = momnxy(i) + sigb(i,5)
-              ! -> Update the back-stress variables with the new plastic strain increment
-              sigb(i,1) = sigb(i,1) + cm*depsp_x
-              sigb(i,2) = sigb(i,2) + cm*depsp_y
-              sigb(i,3) = sigb(i,3) + cb*dkp_x
-              sigb(i,4) = sigb(i,4) + cb*dkp_y
-              sigb(i,5) = sigb(i,5) + cb*dkp_xy
-              ! -> Add the new back-stress contribution
-              signxx(i) = signxx(i) - sigb(i,1)
-              signyy(i) = signyy(i) - sigb(i,2)
-              momnxx(i) = momnxx(i) - sigb(i,3)
-              momnyy(i) = momnyy(i) - sigb(i,4)
-              momnxy(i) = momnxy(i) - sigb(i,5)
-              !< Update the limit moments for the plasticity criteria
-              !< - Positive bending moment for the reinforcement in x direction
-              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
-              !< Negative bending moment
-              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))
-              !< Positive bending moment
-              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
-              !< Negative bending moment
-              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))      
-              !< Update the plasticity criteria
-              f1p(i) = -(momnxx(i) - mfx_pos(i))*(momnyy(i) - mfy_pos(i)) +    &
-                                                      momnxy(i)*momnxy(i)
-              f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +    &
-                                                      momnxy(i)*momnxy(i)
-              g1p(i) =   momnxx(i) - mfx_pos(i) + momnyy(i) - mfy_pos(i)
-              g2p(i) = -(momnxx(i) - mfx_neg(i) + momnyy(i) - mfy_neg(i))
-              if (g1p(i) <= zero) exit
-              if (g2p(i) <= zero) exit
-            enddo
-          enddo
-        endif
+              Mx_out  = Ax + t*(Bx-Ax)
+              My_out  = Ay + t*(By-Ay)
+              Mxy_out = zero
+              ! Cas particulier : apex commun (Mfxp=Mfxn et Mfyp=Mfyn → iregime=4)
+              if (abs(mfx_pos(i) - mfx_neg(i)) < eps_soc(i) .and. &
+                  abs(mfy_pos(i) - mfy_neg(i)) < eps_soc(i)) then
+                Mx_out  = mfx_pos(i)
+                My_out  = mfy_pos(i)
+                Mxy_out = zero
+              endif
+            endif
 !
-        !-----------------------------------------------------------------------
-        !< Only criterion I active
-        !-----------------------------------------------------------------------
-        if (nindx2 > 0) then
-          do ii = 1, nindx2
-            i = indx2(ii)
-            iter = 0
-            do while ((abs(f1p(i)) > tol) .and. (iter < nmax))
-              iter = iter + 1
-              !< Normal derivatives of the criteria f_I 
-              dfI_dMx  = -(momnyy(i) - mfy_pos(i))
-              dfI_dMy  = -(momnxx(i) - mfx_pos(i))
-              dfI_dMxy =  two * momnxy(i)
-              dfI_dNx  =  (momnyy(i) - mfy_pos(i)) * dmfx_pos(i)
-              dfI_dNy  =  (momnxx(i) - mfx_pos(i)) * dmfy_pos(i)
-              !< Dénominateur de lambda_p
-              !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
-              den = dfI_dNx*((Dm11 + cm)*dfI_dNx + Dm12*dfI_dNy) +           & 
-                    dfI_dNy*(Dm12*dfI_dNx + (Dm11 + cm)*dfI_dNy) +           &
-              !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
-                    dfI_dMx*((Db11(i) + cb)*dfI_dMx + Db12(i)*dfI_dMy) +     &
-                    dfI_dMy*(Db21(i)*dfI_dMx + (Db22(i) + cb)*dfI_dMy) +     &
-                    dfI_dMxy*((Db33(i) + cb)*dfI_dMxy)
-              !< Plastic multiplier
-              den = sign(max(abs(den),em20),den)      
-              lam_I = f1p(i) / den
-              !< Correction des déformations plastiques
-              depsp_x   = lam_I * dfI_dNx
-              depsp_y   = lam_I * dfI_dNy
-              dkp_x     = lam_I * dfI_dMx
-              dkp_y     = lam_I * dfI_dMy
-              dkp_xy    = lam_I * dfI_dMxy
-              !< Update integrated plastic strains for post-processing and output
-              uvar(i,4) = uvar(i,4) + depsp_x
-              uvar(i,5) = uvar(i,5) + depsp_y
-              uvar(i,6) = uvar(i,6) + dkp_x
-              uvar(i,7) = uvar(i,7) + dkp_y
-              uvar(i,8) = uvar(i,8) + dkp_xy
-              !< Update equivalent plastic strain for output and post-processing
-              pla(i)    = pla(i)    + lam_I
-              pla(i)    = max(pla(i), zero)
-              !< Update of the membrane stresses and bending moments
-              signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
-              momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y
-              momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
-              momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
-              !< Update kinematic hardening variables
-              ! -> Remove previous contribution of the back-stress to the trial stress
-              signxx(i) = signxx(i) + sigb(i,1)
-              signyy(i) = signyy(i) + sigb(i,2)
-              momnxx(i) = momnxx(i) + sigb(i,3)
-              momnyy(i) = momnyy(i) + sigb(i,4)
-              momnxy(i) = momnxy(i) + sigb(i,5)
-              ! -> Update of the back-stress with the new plastic strain increment
-              sigb(i,1) = sigb(i,1) + cm*depsp_x
-              sigb(i,2) = sigb(i,2) + cm*depsp_y
-              sigb(i,3) = sigb(i,3) + cb*dkp_x
-              sigb(i,4) = sigb(i,4) + cb*dkp_y
-              sigb(i,5) = sigb(i,5) + cb*dkp_xy
-              ! -> Re-apply the back-stress contribution to the updated trial stress
-              signxx(i) = signxx(i) - sigb(i,1)
-              signyy(i) = signyy(i) - sigb(i,2)
-              momnxx(i) = momnxx(i) - sigb(i,3)
-              momnyy(i) = momnyy(i) - sigb(i,4)
-              momnxy(i) = momnxy(i) - sigb(i,5)
-              !< Update the limit moments for the plasticity criteria
-              !< - Positive bending moment for the reinforcement in x direction
-              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
-              !< - Positive bending moment for the reinforcement in y direction
-              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
-              !< Update the plasticity criteria
-              f1p(i) = -(momnxx(i) - mfx_pos(i))*(momnyy(i) - mfy_pos(i)) +    &
-                                                      momnxy(i)*momnxy(i)
-              g1p(i) =   momnxx(i) - mfx_pos(i) + momnyy(i) - mfy_pos(i)
-              if (g1p(i) <= zero) exit
-            enddo
-          enddo
-        endif
+            !-------------------------------------------------------------------
+            !< Update internal variables
+            !-------------------------------------------------------------------
+            ! -> Bending plastic curvature increments
+            det = (Db11(i)+cb)*(Db22(i)+cb) - Db12(i)**2
+            dkp_x = (Db22(i) + cb)*(momnxx(i) - Mx_out) - Db12(i)* (momnyy(i) - My_out)
+            dkp_y = (Db11(i) + cb)*(momnyy(i) - My_out) - Db12(i)* (momnxx(i) - Mx_out)
+            dkp_x = dkp_x / sign(max(abs(det), em20), det)
+            dkp_y = dkp_y / sign(max(abs(det), em20), det)
+            dkp_xy = (momnxy(i) - Mxy_out) / sign(max(abs(Db33(i)+cb),em20),Db33(i)+cb)
+            ! -> Membrane plastic strain increments
+            if (f_II_check <= eps_soc(i) .and. f_I_check > eps_soc(i)) then
+              depsp_x = dmfx_pos(i) * dkp_x
+              depsp_y = dmfy_pos(i) * dkp_y
+            elseif (f_I_check <= eps_soc(i) .and. f_II_check > eps_soc(i)) then
+              depsp_x = dmfx_neg(i) * dkp_x
+              depsp_y = dmfy_neg(i) * dkp_y
+            else
+              depsp_x = (dmfx_pos(i) * (one - t) + dmfx_neg(i) * t) * dkp_x
+              depsp_y = (dmfy_pos(i) * (one - t) + dmfy_neg(i) * t) * dkp_y
+            endif
+            ! -> Save integrated plastic strains for output and post-processing
+            uvar(i,4) = uvar(i,4) + depsp_x
+            uvar(i,5) = uvar(i,5) + depsp_y
+            uvar(i,6) = uvar(i,6) + dkp_x
+            uvar(i,7) = uvar(i,7) + dkp_y
+            uvar(i,8) = uvar(i,8) + dkp_xy
+            pla(i) = sqrt(uvar(i,4)**2 + uvar(i,5)**2 + uvar(i,6)**2 +         &
+                                         uvar(i,7)**2 + uvar(i,8)**2)
+            ! -> Update back-stress for the kinematic hardening contribution
+            sigb(i,1) = sigb(i,1) + cm*depsp_x
+            sigb(i,2) = sigb(i,2) + cm*depsp_y
+            sigb(i,3) = sigb(i,3) + cb*dkp_x
+            sigb(i,4) = sigb(i,4) + cb*dkp_y
+            sigb(i,5) = sigb(i,5) + cb*dkp_xy
 !
-        !-----------------------------------------------------------------------
-        !< Only criterion II active
-        !-----------------------------------------------------------------------
-        if (nindx3 > 0) then
-          do ii = 1, nindx3
-            i = indx3(ii)
-            iter = 0
-            do while ((abs(f2p(i)) > tol) .and. (iter < nmax))
-              iter = iter + 1
-              !< Normal derivatives of the criteria f_II
-              dfII_dMx  = -(momnyy(i) - mfy_neg(i))
-              dfII_dMy  = -(momnxx(i) - mfx_neg(i))
-              dfII_dMxy =  two * momnxy(i)
-              dfII_dNx  =  (momnyy(i) - mfy_neg(i)) * dmfx_neg(i)
-              dfII_dNy  =  (momnxx(i) - mfx_neg(i)) * dmfy_neg(i)
-              !< Dénominateur de lambda_p
-              !< terme membrane : (df/dN)^T (Dm + Cm) (df/dN)
-              den = dfII_dNx*((Dm11 + cm)*dfII_dNx + Dm12*dfII_dNy) +        &
-                    dfII_dNy*(Dm12*dfII_dNx + (Dm11 + cm)*dfII_dNy) +        &
-              !< terme flexion : (df/dM)^T (Db + Cb) (df/dM)
-                    dfII_dMx*((Db11(i) + cb)*dfII_dMx + Db12(i)*dfII_dMy) +  &
-                    dfII_dMy*(Db21(i)*dfII_dMx + (Db22(i) + cb)*dfII_dMy) +  &
-                    dfII_dMxy*((Db33(i) + cb)*dfII_dMxy)
-              !< Plastic multiplier
-              den = sign(max(abs(den),em20),den)      
-              lam_II = f2p(i) / den      
-              !< Correction des déformations plastiques 
-              depsp_x   = lam_II * dfII_dNx
-              depsp_y   = lam_II * dfII_dNy
-              dkp_x     = lam_II * dfII_dMx
-              dkp_y     = lam_II * dfII_dMy
-              dkp_xy    = lam_II * dfII_dMxy
-              !< Update integrated plastic strains for post-processing and output
-              uvar(i,4) = uvar(i,4) + depsp_x
-              uvar(i,5) = uvar(i,5) + depsp_y
-              uvar(i,6) = uvar(i,6) + dkp_x
-              uvar(i,7) = uvar(i,7) + dkp_y
-              uvar(i,8) = uvar(i,8) + dkp_xy
-              !< Update equivalent plastic strain for output and post-processing
-              pla(i)    = pla(i)    + lam_II
-              pla(i)    = max(pla(i), zero)
-              !< Update of the membrane stresses and bending moments
-              signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
-              momnxx(i) = momnxx(i) - Db11(i)*dkp_x - Db12(i)*dkp_y 
-              momnyy(i) = momnyy(i) - Db21(i)*dkp_x - Db22(i)*dkp_y
-              momnxy(i) = momnxy(i) - Db33(i)*dkp_xy
-              !< Update kinematic hardening variables
-              ! -> Remove previous contribution of the back-stress to the trial stress
-              signxx(i) = signxx(i) + sigb(i,1)
-              signyy(i) = signyy(i) + sigb(i,2)
-              momnxx(i) = momnxx(i) + sigb(i,3)
-              momnyy(i) = momnyy(i) + sigb(i,4)
-              momnxy(i) = momnxy(i) + sigb(i,5)
-              ! -> Update of the back-stress with the new plastic strain increment
-              sigb(i,1) = sigb(i,1) + cm*depsp_x
-              sigb(i,2) = sigb(i,2) + cm*depsp_y
-              sigb(i,3) = sigb(i,3) + cb*dkp_x
-              sigb(i,4) = sigb(i,4) + cb*dkp_y
-              sigb(i,5) = sigb(i,5) + cb*dkp_xy
-              ! -> Re-apply the back-stress contribution to the updated trial stress
-              signxx(i) = signxx(i) - sigb(i,1)
-              signyy(i) = signyy(i) - sigb(i,2)
-              momnxx(i) = momnxx(i) - sigb(i,3)
-              momnyy(i) = momnyy(i) - sigb(i,4)
-              momnxy(i) = momnxy(i) - sigb(i,5)
-              !< Update the limit moments for the plasticity criteria
-              !< - Negative bending moment for the reinforcement in x direction
-              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))
-              !< - Negative bending moment for the reinforcement in y direction
-              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x,   &
-                rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))                        
-              !< Update the plasticity criteria
-              f2p(i) = -(momnxx(i) - mfx_neg(i))*(momnyy(i) - mfy_neg(i)) +    &
-                                                      momnxy(i)*momnxy(i)
-              g2p(i) = -(momnxx(i) - mfx_neg(i) + momnyy(i) - mfy_neg(i))
-              if (g2p(i) <= zero) exit
-            enddo
+            !-------------------------------------------------------------------
+            !< Update moments
+            !-------------------------------------------------------------------
+            signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
+            signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
+            momnxx(i) = Mx_out 
+            momnyy(i) = My_out
+            momnxy(i) = Mxy_out
+!
           enddo
         endif
+        !=======================================================================
 ! 
-        !< Remove the contribution of the back-stress to the stresses 
+        !=======================================================================
+        !< - REMOVE THE CONTRIBUTION OF THE BACK-STRESSES
+        !========================================================================
         do i = 1, nel
           signxx(i) = signxx(i) + sigb(i,1)
           signyy(i) = signyy(i) + sigb(i,2)
@@ -676,7 +621,6 @@
           momnyy(i) = momnyy(i) + sigb(i,4)
           momnxy(i) = momnxy(i) + sigb(i,5)
         enddo
-!
         !=======================================================================
         end subroutine sigeps136g
 !
@@ -794,6 +738,7 @@
           real(kind=WP) :: gamma_x, gamma_y, rhox, rhoy, denom_x, denom_y
           integer :: iter
           logical :: found
+          real(kind=WP) :: N_min, N_max
           real(kind=WP), parameter :: tol = 1.0d-8   ! tolerance sur eta
           real(kind=WP), parameter :: eta_min = -1.0d0
           real(kind=WP), parameter :: eta_max = 1.0d0
@@ -807,12 +752,15 @@
           eta_mid = half * (eta_min + eta_max)
 !
           !< Check if N is within the range of N(eta) for eta in [eta_min, eta_max]
-          if (N*xi < N_lo*xi .or. N*xi > N_hi*xi) then
-            if (N*xi < N_lo*xi) then
-              n_f = eta_min
-            else
-              n_f = eta_max
-            end if
+          N_min = min(N_lo, N_hi)
+          N_max = max(N_lo, N_hi)
+          if (N <= N_min) then
+            !< N below the range → take the eta that gives N_min
+            n_f   = merge(eta_min, eta_max, N_lo <= N_hi)
+            found = .true.
+          elseif (N >= N_max) then
+            !< N above the range → take the eta that gives N_max
+            n_f   = merge(eta_max, eta_min, N_lo <= N_hi)
             found = .true.
           endif
 !
@@ -836,7 +784,7 @@
                 exit
               endif
               !< Narrow the interval
-              if (N_mid*xi < N*xi) then
+              if ((N_mid - N)*(N_hi - N_lo) < zero) then
                 eta_lo = eta_mid
               else
                 eta_hi = eta_mid

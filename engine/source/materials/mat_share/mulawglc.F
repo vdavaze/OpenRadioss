@@ -439,13 +439,13 @@ C-------------------------------------------
       ELSEIF (MTN == 136) THEN 
         CALL SIGEPS136G(
      1     JLT    ,MATPARAM,RHO    ,LBUF%DMG,THK0   ,
-     3     DEPSXX ,DEPSYY ,DEPSXY  ,DEPSYZ  ,DEPSZX ,
-     4     DEPBXX ,DEPBYY ,DEPBXY  ,
-     5     SIGOXX ,SIGOYY ,SIGOXY  ,SIGOYZ  ,SIGOZX ,
-     7     SIGNXX ,SIGNYY ,SIGNXY  ,SIGNYZ  ,SIGNZX ,
-     8     MOMNXX ,MOMNYY ,MOMNXY  ,
-     9     SSP    ,ETSE   ,GS      ,NUVAR   ,UVAR   ,
-     A     SHF    ,LBUF%PLA,LBUF%SIGB)
+     2     DEPSXX ,DEPSYY ,DEPSXY  ,DEPSYZ  ,DEPSZX ,
+     3     DEPBXX ,DEPBYY ,DEPBXY  ,
+     4     SIGOXX ,SIGOYY ,SIGOXY  ,SIGOYZ  ,SIGOZX ,
+     5     SIGNXX ,SIGNYY ,SIGNXY  ,SIGNYZ  ,SIGNZX ,
+     6     MOMNXX ,MOMNYY ,MOMNXY  ,
+     7     SSP    ,ETSE   ,GS      ,NUVAR   ,UVAR   ,
+     8     SHF    ,LBUF%PLA,LBUF%SIGB,AREA  )
       ENDIF ! IF (MTN == 1) THEN
 C-----------------------
 C     DAMPING
