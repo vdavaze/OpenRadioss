@@ -87,25 +87,24 @@
           dmax1,dmax2,Dm11,Dm12,cm,cb
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
         real(kind=WP) :: center, radius, kappa1, kappa2, tr_kb, Y1,            &
-          Y2,d1_trial,d2_trial,A11,A12,A22,dW1_dk1,dW1_dk2,dW2_dk1,            &
+          Y2,d1_trial,d2_trial,dW1_dk1,dW1_dk2,dW2_dk1,                        &
           dW2_dk2,dW1_dkxx,dW1_dkyy,dW1_dkxy,dW2_dkxx,dW2_dkyy,dW2_dkxy,       &
-          fac1,fac2,A21,dkap1dkxx,dkap1dkyy,dkap1dkxy,dkap2dkxx,dkap2dkyy,     &
+          fac1,fac2,dkap1dkxx,dkap1dkyy,dkap1dkxy,dkap2dkxx,dkap2dkyy,         &
           dkap2dkxy,phi_b_pos,phi_b_neg,depsp_x,depsp_y,dkp_x,dkp_y,dkp_xy
         real(kind=WP), dimension(nel) :: xi_tr, epbxx, epbyy, epbxy, xi_kap1,  &
           xi_kap2, Db11, Db12, Db21, Db22, Db33, mfx_pos, mfx_neg, mfy_pos,    &
           mfy_neg, dmfx_pos, dmfx_neg, dmfy_pos, dmfy_neg, eps_soc, Mx_rb_I,   & 
-          My_rb_I, Mxy_rb_I, Mx_rb_II, My_rb_II, Mxy_rb_II
+          My_rb_I, Mxy_rb_I, Mx_rb_II, My_rb_II, Mxy_rb_II, eps_geo
         real(kind = WP) :: AB2, AP_dot_AB,Ax, Ay, Bx, By, coef, f_I_check,     &
-          f_II_check,Mx_apex_I,Mx_I_star,Mx_II_star,My_apex_I,My_I_star,       &
-          My_II_star, Mxy_apex_I,Mxy_I_star,Mxy_II_star,Mx_out,Mxy_out,My_out, &
-          Nx_out,Ny_out,p_I,q_I,p_II,q_II,p_I_star,q_I_star,p_II_star,         &
+          f_II_check,Mx_I_star,Mx_II_star,My_I_star,                           &
+          My_II_star,Mxy_I_star,Mxy_II_star,Mx_out,Mxy_out,My_out,             &
+          p_I,q_I,p_II,q_II,p_I_star,q_I_star,p_II_star,                       &
           q_II_star,Px,Py,Pz,r_I,r_I_star,r_II,r_II_star,rho_I,rho_II,t,det,   &
           c_membrane, c_bending, Db_eff, Le_approx
         real(kind=WP), dimension(2) :: rho_x, rho_y, sig_y, omega_x, omega_y
         real(kind=WP), parameter :: tol = 1.0d-3
         real(kind=WP), parameter :: xi_pos = 1.0d0
         real(kind=WP), parameter :: xi_neg = -1.0d0
-        integer, parameter :: nmax = 100
 !
         !=======================================================================
         !< - Initialisation of computation on time step
@@ -366,7 +365,10 @@
           My_rb_II(i)  = mfy_neg(i) - momnyy(i)
           Mxy_rb_II(i) = momnxy(i)
           !< Tolerance for the plasticity criterion
-          eps_soc(i) = 1.0d-4
+          eps_soc(i) = 1.0d-14 * max(abs(mfx_pos(i)), abs(mfy_pos(i)),          &
+                                   abs(mfx_neg(i)), abs(mfy_neg(i)), one)**2
+          eps_geo(i) = 1.0d-7  * max(abs(mfx_pos(i)), abs(mfy_pos(i)),          &
+                                   abs(mfx_neg(i)), abs(mfy_neg(i)), one)
           !< Check of the plasticity criterion for positive and negative bending
           ! Note : f ≤ 0 and Mx_rb ≤ 0 and My_rb ≤ 0 to be in the elastic domain
           if ( &
@@ -438,13 +440,13 @@
             !-------------------------------------------------------------------
             ! write(*,*) "Projection on SOC for positive bending criterion f_I"
             ! -> Case A : Already inside the cone → identity
-            if (rho_I <= -p_I + eps_soc(i)) then
+            if (rho_I <= -p_I + eps_geo(i)) then
               p_I_star = p_I
               q_I_star = q_I
               r_I_star = r_I
               ! write(*,*) "Case A : already inside the cone, no projection needed."
             ! -> Case B : Inside the dual cone → apex
-            elseif (p_I >= zero .and. rho_I <= p_I + eps_soc(i)) then
+            elseif (p_I >= zero .and. rho_I <= p_I + eps_geo(i)) then
               p_I_star = zero
               q_I_star = zero
               r_I_star = zero
@@ -465,13 +467,13 @@
             !-------------------------------------------------------------------
             ! write(*,*) "Projection on SOC for negative bending criterion f_II"
             !< Case A : Already inside the cone → identity
-            if (rho_II <= -p_II + eps_soc(i)) then
+            if (rho_II <= -p_II + eps_geo(i)) then
               p_II_star = p_II
               q_II_star = q_II
               r_II_star = r_II
               ! write(*,*) "Case A : already inside the cone, no projection needed."
             !< Case B : Inside the dual cone → apex
-            elseif (p_II >= zero .and. rho_II <= p_II + eps_soc(i)) then
+            elseif (p_II >= zero .and. rho_II <= p_II + eps_geo(i)) then
               p_II_star = zero
               q_II_star = zero
               r_II_star = zero
@@ -554,8 +556,8 @@
               My_out  = Ay + t*(By-Ay)
               Mxy_out = zero
               ! Cas particulier : apex commun (Mfxp=Mfxn et Mfyp=Mfyn → iregime=4)
-              if (abs(mfx_pos(i) - mfx_neg(i)) < eps_soc(i) .and. &
-                  abs(mfy_pos(i) - mfy_neg(i)) < eps_soc(i)) then
+              if (abs(mfx_pos(i) - mfx_neg(i)) < eps_geo(i) .and. &
+                  abs(mfy_pos(i) - mfy_neg(i)) < eps_geo(i)) then
                 Mx_out  = mfx_pos(i)
                 My_out  = mfy_pos(i)
                 Mxy_out = zero
@@ -786,8 +788,10 @@
               !< Narrow the interval
               if ((N_mid - N)*(N_hi - N_lo) < zero) then
                 eta_lo = eta_mid
+                N_lo   = N_mid
               else
                 eta_hi = eta_mid
+                N_hi   = N_mid
               endif
             enddo
           endif
