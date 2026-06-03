@@ -82,7 +82,7 @@
 !----------------------------------------------------------------
 !  L o c a l  V a r i a b l e s
 !----------------------------------------------------------------
-        integer :: i,ii,nindx,indx(nel)
+        integer :: i,ii,nindx,indx(nel),iter
         real(kind=WP) :: young,nu,shear,lambda_m,mu_m,f_t,f_c,gamma,           &
           dmax1,dmax2,Dm11,Dm12,cm,cb
         real(kind=WP), dimension(nel) :: lambda_b, mu_b, k0_1, k0_2
@@ -100,7 +100,8 @@
           My_II_star,Mxy_I_star,Mxy_II_star,Mx_out,Mxy_out,My_out,             &
           p_I,q_I,p_II,q_II,p_I_star,q_I_star,p_II_star,                       &
           q_II_star,Px,Py,Pz,r_I,r_I_star,r_II,r_II_star,rho_I,rho_II,t,det,   &
-          c_membrane, c_bending, Db_eff, Le_approx
+          c_membrane, c_bending, Db_eff, Le_approx, ddepsp_x, ddepsp_y,        &
+          ddkp_x, ddkp_y, ddkp_xy
         real(kind=WP), dimension(2) :: rho_x, rho_y, sig_y, omega_x, omega_y
         real(kind=WP), parameter :: tol = 1.0d-3
         real(kind=WP), parameter :: xi_pos = 1.0d0
@@ -398,231 +399,256 @@
           !< Loop over the yielding elements
           do ii = 1, nindx
             i = indx(ii)
+            ddepsp_x = zero
+            ddepsp_y = zero
+            ddkp_x = zero
+            ddkp_y = zero
+            ddkp_xy = zero
+            do iter = 1,10    
 !
-            !-------------------------------------------------------------------
-            !< Change of variables to express the criterion in the form of a SOC
-            !-------------------------------------------------------------------
-            !
-            ! Transformation : (Mx_rb, My_rb, Mxy) → (p, q, r)
-            !   p = (Mx_rb + My_rb) / 2   ← cone axis (must be ≤ 0)
-            !   q = (Mx_rb - My_rb) / 2   ← 1st transverse component
-            !   r = Mxy                   ← 2nd transverse component
-            !
-            ! Johansen's cone becomes : sqrt(q²+r²) ≤ -p, p ≤ 0
-            !=======================================================================
-            !< SOC coordinates for positive bending criterion f_I
-            p_I = half * (Mx_rb_I(i)  + My_rb_I(i))
-            q_I = half * (Mx_rb_I(i)  - My_rb_I(i))
-            r_I = momnxy(i)
-            !< SOC coordinates for negative bending criterion f_II
-            p_II = half * (Mx_rb_II(i) + My_rb_II(i))
-            q_II = half * (Mx_rb_II(i) - My_rb_II(i))
-            r_II = momnxy(i)
-            !< Transverse norms
-            rho_I  = sqrt(q_I**2  + r_I**2)
-            rho_II = sqrt(q_II**2 + r_II**2)
-
-            ! write(*,*) "Element ", i, " is yielding. Return mapping on SOC in progress..."
-            ! write(*,*) "signxx, signyy, momnxx, momnyy, momnxy = ", signxx(i), signyy(i), momnxx(i), momnyy(i), momnxy(i)
-            ! write(*,*) "p_I, q_I, r_I = ", p_I, q_I, r_I
-            ! write(*,*) "p_II, q_II, r_II = ", p_II, q_II, r_II
-            ! write(*,*) "rho_I, rho_II = ", rho_I, rho_II
-            ! write(*,*) "mfx_pos, mfy_pos = ", mfx_pos(i), mfy_pos(i)
-            ! write(*,*) "mfx_neg, mfy_neg = ", mfx_neg(i), mfy_neg(i)
-            ! write(*,*) "sigb(i,1), sigb(i,2), sigb(i,3), sigb(i,4), sigb(i,5) = ", &
-            !   sigb(i,1), sigb(i,2), sigb(i,3), sigb(i,4), sigb(i,5)
-            ! write(*,*) "Mx_rb_I, My_rb_I, Mxy_rb_I = ", Mx_rb_I(i), My_rb_I(i), Mxy_rb_I(i)
-            ! write(*,*) "Mx_rb_II, My_rb_II, Mxy_rb_II = ", Mx_rb_II(i), My_rb_II(i), Mxy_rb_II(i)
-            ! pause
-!
-            !-------------------------------------------------------------------
-            !< Projection on the SOC of positive bending criterion f_I 
-            !-------------------------------------------------------------------
-            ! write(*,*) "Projection on SOC for positive bending criterion f_I"
-            ! -> Case A : Already inside the cone → identity
-            if (rho_I <= -p_I + eps_geo(i)) then
-              p_I_star = p_I
-              q_I_star = q_I
-              r_I_star = r_I
-              ! write(*,*) "Case A : already inside the cone, no projection needed."
-            ! -> Case B : Inside the dual cone → apex
-            elseif (p_I >= zero .and. rho_I <= p_I + eps_geo(i)) then
-              p_I_star = zero
-              q_I_star = zero
-              r_I_star = zero
-              ! write(*,*) "Case B : inside the dual cone, projection on the apex."
-            ! -> Case C : General case → projection on the cone surface
-            else
-              coef = half*(one - p_I/rho_I)  
-              p_I_star = -coef * rho_I
-              q_I_star =  coef * q_I
-              r_I_star =  coef * r_I
-              ! write(*,*) "Case C : general case, projection on the cone surface."
-            endif
-            ! write(*,*) "Projected SOC coordinates for f_I : p_I_star, q_I_star, r_I_star = ", &
-             ! p_I_star, q_I_star, r_I_star
-!
-            !-------------------------------------------------------------------
-            !< Projection on the SOC of negative bending criterion f_II
-            !-------------------------------------------------------------------
-            ! write(*,*) "Projection on SOC for negative bending criterion f_II"
-            !< Case A : Already inside the cone → identity
-            if (rho_II <= -p_II + eps_geo(i)) then
-              p_II_star = p_II
-              q_II_star = q_II
-              r_II_star = r_II
-              ! write(*,*) "Case A : already inside the cone, no projection needed."
-            !< Case B : Inside the dual cone → apex
-            elseif (p_II >= zero .and. rho_II <= p_II + eps_geo(i)) then
-              p_II_star = zero
-              q_II_star = zero
-              r_II_star = zero
-              ! write(*,*) "Case B : inside the dual cone, projection on the apex."
-            !< Case C : General case → projection on the cone surface
-            else
-              coef  = half*(one - p_II/rho_II)
-              p_II_star = -coef * rho_II
-              q_II_star =  coef * q_II
-              r_II_star =  coef * r_II
-              ! write(*,*) "Case C : general case, projection on the cone surface."
-            endif
-            ! write(*,*) "Projected SOC coordinates for f_II : p_II_star, q_II_star, r_II_star = ", &
-             ! p_II_star, q_II_star, r_II_star
-            ! pause
-!
-            !-------------------------------------------------------------------
-            !< Return to physical variables
-            !------------------------------------------------------------------- 
-            !< For positive bending criterion f_I        
-            Mx_I_star  = p_I_star  + q_I_star  + mfx_pos(i)
-            My_I_star  = p_I_star  - q_I_star  + mfy_pos(i)
-            Mxy_I_star = r_I_star
-            !< For negative bending criterion f_II
-            Mx_II_star  = mfx_neg(i) - p_II_star - q_II_star
-            My_II_star  = mfy_neg(i) - p_II_star + q_II_star
-            Mxy_II_star = r_II_star
-!
-            !-------------------------------------------------------------------
-            ! Selection of the active set of constraints and final projection
-            ! Logic :
-            !   - Project on f_I and check if f_II is satisfied
-            !   - Project on f_II and check if f_I is satisfied
-            !   - If both are violated → projection on the intersection
-            !-------------------------------------------------------------------
-            f_II_check = -(Mx_I_star  - mfx_neg(i))*(My_I_star  - mfy_neg(i)) + Mxy_I_star**2
-            f_I_check  = -(Mx_II_star - mfx_pos(i))*(My_II_star - mfy_pos(i)) + Mxy_II_star**2
-            if (f_II_check <= eps_soc(i)) then
-              !< Projection on f_I only, f_II is already satisfied
-              Mx_out  = Mx_I_star
-              My_out  = My_I_star
-              Mxy_out = Mxy_I_star
-            elseif (f_I_check <= eps_soc(i)) then
-              !< Projection on f_II only, f_I is already satisfied
-              Mx_out  = Mx_II_star
-              My_out  = My_II_star
-              Mxy_out = Mxy_II_star
-            else
-              !< Both criteria are active → projection on the intersection
-              ! The intersection of two convex SOCs is convex
-              ! → analytical projection on the common edge
-              !--------------------------------------------------------------------
-              ! The apexes of the two cones in the physical space:
-              !   Apex of f_I  : (Mx=Mfxp+bx, My=Mfyp+by, Mxy=0)
-              !   Apex of f_II : (Mx=Mfxn+bx, My=Mfyn+by, Mxy=0)
+              !-------------------------------------------------------------------
+              !< Change of variables to express the criterion in the form of a SOC
+              !-------------------------------------------------------------------
               !
-              ! The projection on the intersection is the convex combination
-              ! of the two apexes that minimizes the distance to the trial point.
-              ! It's a 1D analytical problem in the parameter t ∈ [0,1].
-              !--------------------------------------------------------------------
-              ! Projection of the trial point onto the segment [apex_I, apex_II]
-              ! (Mxy=0 along the entire edge)
-              Ax = mfx_pos(i)
-              Ay = mfy_pos(i)
-              Bx = mfx_neg(i)
-              By = mfy_neg(i)
-              Px = momnxx(i)
-              Py = momnyy(i)
-              Pz = momnxy(i)
-              AB2 = (Bx-Ax)**2 + (By-Ay)**2
-              if (AB2 < em20) then
-                ! Degenerate segment → projection = A
-                t = zero
+              ! Transformation : (Mx_rb, My_rb, Mxy) → (p, q, r)
+              !   p = (Mx_rb + My_rb) / 2   ← cone axis (must be ≤ 0)
+              !   q = (Mx_rb - My_rb) / 2   ← 1st transverse component
+              !   r = Mxy                   ← 2nd transverse component
+              !
+              ! Johansen's cone becomes : sqrt(q²+r²) ≤ -p, p ≤ 0
+              !=======================================================================
+              !< SOC coordinates for positive bending criterion f_I
+              p_I = half * (Mx_rb_I(i)  + My_rb_I(i))
+              q_I = half * (Mx_rb_I(i)  - My_rb_I(i))
+              r_I = momnxy(i)
+              !< SOC coordinates for negative bending criterion f_II
+              p_II = half * (Mx_rb_II(i) + My_rb_II(i))
+              q_II = half * (Mx_rb_II(i) - My_rb_II(i))
+              r_II = momnxy(i)
+              !< Transverse norms
+              rho_I  = sqrt(q_I**2  + r_I**2)
+              rho_II = sqrt(q_II**2 + r_II**2)
+!
+              !-------------------------------------------------------------------
+              !< Projection on the SOC of positive bending criterion f_I 
+              !-------------------------------------------------------------------
+              ! -> Case A : Already inside the cone → identity
+              if (rho_I <= -p_I + eps_geo(i)) then
+                p_I_star = p_I
+                q_I_star = q_I
+                r_I_star = r_I
+              ! -> Case B : Inside the dual cone → apex
+              elseif (p_I >= zero .and. rho_I <= p_I + eps_geo(i)) then
+                p_I_star = zero
+                q_I_star = zero
+                r_I_star = zero
+              ! -> Case C : General case → projection on the cone surface
               else
-                AP_dot_AB = (Px-Ax)*(Bx-Ax) + (Py-Ay)*(By-Ay)
-                t = AP_dot_AB / AB2
-                t = max(zero, min(one, t))  ! clamp sur [0,1]
+                coef = half*(one - p_I/rho_I)  
+                p_I_star = -coef * rho_I
+                q_I_star =  coef * q_I
+                r_I_star =  coef * r_I
               endif
-              Mx_out  = Ax + t*(Bx-Ax)
-              My_out  = Ay + t*(By-Ay)
-              Mxy_out = zero
-              ! Cas particulier : apex commun (Mfxp=Mfxn et Mfyp=Mfyn → iregime=4)
-              if (abs(mfx_pos(i) - mfx_neg(i)) < eps_geo(i) .and. &
-                  abs(mfy_pos(i) - mfy_neg(i)) < eps_geo(i)) then
-                Mx_out  = mfx_pos(i)
-                My_out  = mfy_pos(i)
+!
+              !-------------------------------------------------------------------
+              !< Projection on the SOC of negative bending criterion f_II
+              !-------------------------------------------------------------------
+              !< Case A : Already inside the cone → identity
+              if (rho_II <= -p_II + eps_geo(i)) then
+                p_II_star = p_II
+                q_II_star = q_II
+                r_II_star = r_II
+              !< Case B : Inside the dual cone → apex
+              elseif (p_II >= zero .and. rho_II <= p_II + eps_geo(i)) then
+                p_II_star = zero
+                q_II_star = zero
+                r_II_star = zero
+              !< Case C : General case → projection on the cone surface
+              else
+                coef  = half*(one - p_II/rho_II)
+                p_II_star = -coef * rho_II
+                q_II_star =  coef * q_II
+                r_II_star =  coef * r_II
+              endif
+!
+              !-------------------------------------------------------------------
+              !< Return to physical variables
+              !------------------------------------------------------------------- 
+              !< For positive bending criterion f_I        
+              Mx_I_star  = p_I_star  + q_I_star  + mfx_pos(i)
+              My_I_star  = p_I_star  - q_I_star  + mfy_pos(i)
+              Mxy_I_star = r_I_star
+              !< For negative bending criterion f_II
+              Mx_II_star  = mfx_neg(i) - p_II_star - q_II_star
+              My_II_star  = mfy_neg(i) - p_II_star + q_II_star
+              Mxy_II_star = r_II_star
+!
+              !-------------------------------------------------------------------
+              ! Selection of the active set of constraints and final projection
+              ! Logic :
+              !   - Project on f_I and check if f_II is satisfied
+              !   - Project on f_II and check if f_I is satisfied
+              !   - If both are violated → projection on the intersection
+              !-------------------------------------------------------------------
+              f_II_check = -(Mx_I_star  - mfx_neg(i))*(My_I_star  - mfy_neg(i)) + Mxy_I_star**2
+              f_I_check  = -(Mx_II_star - mfx_pos(i))*(My_II_star - mfy_pos(i)) + Mxy_II_star**2
+              if (f_II_check <= eps_soc(i)) then
+                !< Projection on f_I only, f_II is already satisfied
+                Mx_out  = Mx_I_star
+                My_out  = My_I_star
+                Mxy_out = Mxy_I_star
+              elseif (f_I_check <= eps_soc(i)) then
+                !< Projection on f_II only, f_I is already satisfied
+                Mx_out  = Mx_II_star
+                My_out  = My_II_star
+                Mxy_out = Mxy_II_star
+              else
+                !< Both criteria are active → projection on the intersection
+                ! The intersection of two convex SOCs is convex
+                ! → analytical projection on the common edge
+                !--------------------------------------------------------------------
+                ! The apexes of the two cones in the physical space:
+                !   Apex of f_I  : (Mx=Mfxp+bx, My=Mfyp+by, Mxy=0)
+                !   Apex of f_II : (Mx=Mfxn+bx, My=Mfyn+by, Mxy=0)
+                !
+                ! The projection on the intersection is the convex combination
+                ! of the two apexes that minimizes the distance to the trial point.
+                ! It's a 1D analytical problem in the parameter t ∈ [0,1].
+                !--------------------------------------------------------------------
+                ! Projection of the trial point onto the segment [apex_I, apex_II]
+                ! (Mxy=0 along the entire edge)
+                Ax = mfx_pos(i)
+                Ay = mfy_pos(i)
+                Bx = mfx_neg(i)
+                By = mfy_neg(i)
+                Px = momnxx(i)
+                Py = momnyy(i)
+                Pz = momnxy(i)
+                AB2 = (Bx-Ax)**2 + (By-Ay)**2
+                if (AB2 < em20) then
+                  ! Degenerate segment → projection = A
+                  t = zero
+                else
+                  AP_dot_AB = (Px-Ax)*(Bx-Ax) + (Py-Ay)*(By-Ay)
+                  t = AP_dot_AB / AB2
+                  t = max(zero, min(one, t))  ! clamp sur [0,1]
+                endif
+                Mx_out  = Ax + t*(Bx-Ax)
+                My_out  = Ay + t*(By-Ay)
                 Mxy_out = zero
+                ! Cas particulier : apex commun (Mfxp=Mfxn et Mfyp=Mfyn → iregime=4)
+                if (abs(mfx_pos(i) - mfx_neg(i)) < eps_geo(i) .and. &
+                    abs(mfy_pos(i) - mfy_neg(i)) < eps_geo(i)) then
+                  Mx_out  = mfx_pos(i)
+                  My_out  = mfy_pos(i)
+                  Mxy_out = zero
+                endif
               endif
-            endif
 !
-            !-------------------------------------------------------------------
-            !< Update internal variables
-            !-------------------------------------------------------------------
-            ! -> Bending plastic curvature increments
-            det = (Db11(i)+cb)*(Db22(i)+cb) - Db12(i)**2
-            dkp_x = (Db22(i) + cb)*(momnxx(i) - Mx_out) - Db12(i)* (momnyy(i) - My_out)
-            dkp_y = (Db11(i) + cb)*(momnyy(i) - My_out) - Db12(i)* (momnxx(i) - Mx_out)
-            dkp_x = dkp_x / sign(max(abs(det), em20), det)
-            dkp_y = dkp_y / sign(max(abs(det), em20), det)
-            dkp_xy = (momnxy(i) - Mxy_out) / sign(max(abs(Db33(i)+cb),em20),Db33(i)+cb)
-            ! -> Membrane plastic strain increments
-            if (f_II_check <= eps_soc(i) .and. f_I_check > eps_soc(i)) then
-              depsp_x = dmfx_pos(i) * dkp_x
-              depsp_y = dmfy_pos(i) * dkp_y
-            elseif (f_I_check <= eps_soc(i) .and. f_II_check > eps_soc(i)) then
-              depsp_x = dmfx_neg(i) * dkp_x
-              depsp_y = dmfy_neg(i) * dkp_y
-            else
-              depsp_x = (dmfx_pos(i) * (one - t) + dmfx_neg(i) * t) * dkp_x
-              depsp_y = (dmfy_pos(i) * (one - t) + dmfy_neg(i) * t) * dkp_y
-            endif
+              !-------------------------------------------------------------------
+              !< Update internal variables
+              !-------------------------------------------------------------------
+              ! -> Bending plastic curvature increments
+              det = (Db11(i)+cb)*(Db22(i)+cb) - Db12(i)**2
+              dkp_x = (Db22(i) + cb)*(momnxx(i) - Mx_out) - Db12(i)* (momnyy(i) - My_out)
+              dkp_y = (Db11(i) + cb)*(momnyy(i) - My_out) - Db12(i)* (momnxx(i) - Mx_out)
+              dkp_x = dkp_x / sign(max(abs(det), em20), det)
+              dkp_y = dkp_y / sign(max(abs(det), em20), det)
+              dkp_xy = (momnxy(i) - Mxy_out) / sign(max(abs(Db33(i)+cb),em20),Db33(i)+cb)
+              ! -> Membrane plastic strain increments
+              if (f_II_check <= eps_soc(i) .and. f_I_check > eps_soc(i)) then
+                depsp_x = -dmfx_pos(i) * dkp_x
+                depsp_y = -dmfy_pos(i) * dkp_y
+              elseif (f_I_check <= eps_soc(i) .and. f_II_check > eps_soc(i)) then
+                depsp_x = -dmfx_neg(i) * dkp_x
+                depsp_y = -dmfy_neg(i) * dkp_y
+              else
+                depsp_x = -(dmfx_pos(i) * (one - t) + dmfx_neg(i) * t) * dkp_x
+                depsp_y = -(dmfy_pos(i) * (one - t) + dmfy_neg(i) * t) * dkp_y
+              endif
+!
+              ddepsp_x = ddepsp_x + depsp_x
+              ddepsp_y = ddepsp_y + depsp_y
+              ddkp_x = ddkp_x + dkp_x
+              ddkp_y = ddkp_y + dkp_y
+              ddkp_xy = ddkp_xy + dkp_xy
+!
+              !-------------------------------------------------------------------
+              !< Update moments
+              !-------------------------------------------------------------------
+              signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
+              signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
+              momnxx(i) = Mx_out
+              momnyy(i) = My_out
+              momnxy(i) = Mxy_out
+              !< Moment reduced by reinforcements contribution for positive bending
+              !  (limit moment for plasticity criterion)
+              Mx_rb_I(i)   = momnxx(i)  - mfx_pos(i)
+              My_rb_I(i)   = momnyy(i)  - mfy_pos(i)
+              Mxy_rb_I(i)  = momnxy(i) 
+              !< Moment reduced by reinforcements contribution for negative bending
+              Mx_rb_II(i)  = mfx_neg(i) - momnxx(i)
+              My_rb_II(i)  = mfy_neg(i) - momnyy(i)
+              Mxy_rb_II(i) = momnxy(i)    
+!
+              write(*,*) "Iteration ", iter
+              write(*,*) "f_I = ", -(Mx_rb_I(i)*My_rb_I(i) - momnxy(i)**2)
+              write(*,*) "f_II = ", -(Mx_rb_II(i)*My_rb_II(i) - momnxy(i)**2)
+              pause
+!
+              !< Positive bending moment for the reinforcement in x direction
+              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x, &
+                rho_y,zero,xi_pos,mfx_pos(i),dmfx_pos(i))
+              !< Negative bending moment for the reinforcement in x direction
+              call calc_M(signxx(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x, &
+                rho_y,zero,xi_neg,mfx_neg(i),dmfx_neg(i))       
+              !< Positive bending moment for the reinforcement in y direction
+              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x, &
+                rho_y,pi*half,xi_pos,mfy_pos(i),dmfy_pos(i))
+              !< Negative bending moment for the reinforcement in y direction
+              call calc_M(signyy(i),thk0(i),f_c,sig_y,omega_x,omega_y,rho_x, &
+                rho_y,pi*half,xi_neg,mfy_neg(i),dmfy_neg(i))    
+!                
+              !< Moment reduced by reinforcements contribution for positive bending
+              !  (limit moment for plasticity criterion)
+              Mx_rb_I(i)   = momnxx(i)  - mfx_pos(i)
+              My_rb_I(i)   = momnyy(i)  - mfy_pos(i)
+              Mxy_rb_I(i)  = momnxy(i) 
+              !< Moment reduced by reinforcements contribution for negative bending
+              Mx_rb_II(i)  = mfx_neg(i) - momnxx(i)
+              My_rb_II(i)  = mfy_neg(i) - momnyy(i)
+              Mxy_rb_II(i) = momnxy(i)      
+
+              f_I_check =  -(Mx_rb_I(i)*My_rb_I(i))   + momnxy(i)**2
+              f_II_check = -(Mx_rb_II(i)*My_rb_II(i)) + momnxy(i)**2
+!
+            enddo
+!
             ! -> Save integrated plastic strains for output and post-processing
-            uvar(i,4) = uvar(i,4) + depsp_x
-            uvar(i,5) = uvar(i,5) + depsp_y
-            uvar(i,6) = uvar(i,6) + dkp_x
-            uvar(i,7) = uvar(i,7) + dkp_y
-            uvar(i,8) = uvar(i,8) + dkp_xy
-            pla(i) = sqrt(uvar(i,4)**2 + uvar(i,5)**2 + uvar(i,6)**2 +         &
-                                         uvar(i,7)**2 + uvar(i,8)**2)
-            ! -> Update back-stress for the kinematic hardening contribution
-            sigb(i,1) = sigb(i,1) + cm*depsp_x
-            sigb(i,2) = sigb(i,2) + cm*depsp_y
-            sigb(i,3) = sigb(i,3) + cb*dkp_x
-            sigb(i,4) = sigb(i,4) + cb*dkp_y
-            sigb(i,5) = sigb(i,5) + cb*dkp_xy
+            uvar(i,4) = uvar(i,4) + ddepsp_x
+            uvar(i,5) = uvar(i,5) + ddepsp_y
+            uvar(i,6) = uvar(i,6) + ddkp_x
+            uvar(i,7) = uvar(i,7) + ddkp_y
+            uvar(i,8) = uvar(i,8) + ddkp_xy
 !
-            !-------------------------------------------------------------------
-            !< Update moments
-            !-------------------------------------------------------------------
-            signxx(i) = signxx(i) - Dm11*depsp_x - Dm12*depsp_y
-            signyy(i) = signyy(i) - Dm12*depsp_x - Dm11*depsp_y
-            momnxx(i) = Mx_out 
-            momnyy(i) = My_out
-            momnxy(i) = Mxy_out
+            !< Update back stresses
+            sigb(i,1) = sigb(i,1) + cm*ddepsp_x
+            sigb(i,2) = sigb(i,2) + cm*ddepsp_y
+            sigb(i,3) = sigb(i,3) + cb*ddkp_x
+            sigb(i,4) = sigb(i,4) + cb*ddkp_y
+            sigb(i,5) = sigb(i,5) + cb*ddkp_xy   
+!
+            pla(i) = pla(i) + sqrt(ddepsp_x**2 + ddepsp_y**2 + ddkp_x**2 + &
+                                   ddkp_y**2 + ddkp_xy**2)        
+!
+            signxx(i) = signxx(i) + sigb(i,1)
+            signyy(i) = signyy(i) + sigb(i,2)
+            momnxx(i) = momnxx(i) + sigb(i,3)
+            momnyy(i) = momnyy(i) + sigb(i,4)
+            momnxy(i) = momnxy(i) + sigb(i,5) 
 !
           enddo
         endif
-        !=======================================================================
-! 
-        !=======================================================================
-        !< - REMOVE THE CONTRIBUTION OF THE BACK-STRESSES
-        !========================================================================
-        do i = 1, nel
-          signxx(i) = signxx(i) + sigb(i,1)
-          signyy(i) = signyy(i) + sigb(i,2)
-          momnxx(i) = momnxx(i) + sigb(i,3)
-          momnyy(i) = momnyy(i) + sigb(i,4)
-          momnxy(i) = momnxy(i) + sigb(i,5)
-        enddo
         !=======================================================================
         end subroutine sigeps136g
 !
@@ -786,7 +812,7 @@
                 exit
               endif
               !< Narrow the interval
-              if ((N_mid - N)*(N_hi - N_lo) < zero) then
+              if ((N_mid - N) * (N_lo - N) > zero) then
                 eta_lo = eta_mid
                 N_lo   = N_mid
               else
