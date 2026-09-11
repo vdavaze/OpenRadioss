@@ -85,8 +85,7 @@ c
       COUNT2(1:NSPMD) = 0
       TOTAL_NODES     = 0
 c
-      KK = 1
-      IF (NODADT > 0) KK = 2
+      KK = 2
 c
       ! Loop over domains
       DO P=1,NSPMD
@@ -403,10 +402,8 @@ C --------------------------------------------------------------------
            DO L=1,NDDL
               SEND_BUF(K) = NLOC_DMG%FNL(NPOS+L-1,1)
               K = K + 1
-              IF (NODADT > 0) THEN    
-                SEND_BUF(K) = NLOC_DMG%STIFNL(NPOS+L-1,1)
-                K = K + 1
-              ENDIF 
+              SEND_BUF(K) = NLOC_DMG%STIFNL(NPOS+L-1,1)
+              K = K + 1
            ENDDO
          ENDDO
          IAD_SEND(I+1)=K
@@ -443,10 +440,8 @@ c-------------------------------------------------------------------
              DO L=1,NDDL
                 NLOC_DMG%FNL(NPOS+L-1,1)=NLOC_DMG%FNL(NPOS+L-1,1)+RECV_BUF(K)
                 K=K+1
-                IF (NODADT > 0) THEN
-                  NLOC_DMG%STIFNL(NPOS+L-1,1)=NLOC_DMG%STIFNL(NPOS+L-1,1)+RECV_BUF(K)
-                  K = K + 1
-                ENDIF
+                NLOC_DMG%STIFNL(NPOS+L-1,1)=NLOC_DMG%STIFNL(NPOS+L-1,1)+RECV_BUF(K)
+                K = K + 1
              END DO
 
           END DO
@@ -583,10 +578,8 @@ C --------------------------------------------------------------------
            DO L=1,NDDL
               SEND_BUF(K) = NLOC_DMG%FSKY(IJK,L)
               K = K + 1
-              IF (NODADT > 0) THEN
-                SEND_BUF(K) = NLOC_DMG%STSKY(IJK,L)
-                K = K + 1              
-              ENDIF
+              SEND_BUF(K) = NLOC_DMG%STSKY(IJK,L)
+              K = K + 1              
            ENDDO
 
          ENDDO
@@ -624,10 +617,8 @@ c-------------------------------------------------------------------
              DO L=1,NDDL
                 NLOC_DMG%FSKY(IJK,L) = RECV_BUF(K)
                 K = K + 1
-                IF (NODADT > 0) THEN
-                  NLOC_DMG%STSKY(IJK,L) = RECV_BUF(K) 
-                  K = K + 1              
-                ENDIF
+                NLOC_DMG%STSKY(IJK,L) = RECV_BUF(K) 
+                K = K + 1              
              ENDDO
           END DO
         ENDIF

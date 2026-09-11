@@ -4607,10 +4607,13 @@ C Parith/OFF assembly necessary before boundary communication if multi-thread
                   NODLT_NL   = (ITSK+1)*NLOC_DMG%NNOD/NTHREAD
                   CALL ASSPAR_SUB_POFF(NLOC_DMG%FNL ,NODFT_NL,NODLT_NL,
      .                                 NLOC_DMG%POSI,NLOC_DMG%L_NLOC,NTHREAD )
-                  ! Non-local nodal stiffness
+                  ! Non-local nodal stiffness: always assembled. The zero-flux
+                  ! crack BC needs it to detect fully-eroded (orphan) d.o.fs in
+                  ! NLOCAL_FREEZE_ORPHAN, even without /DT/NODA.
+                  CALL ASSPAR_SUB_POFF(NLOC_DMG%STIFNL,NODFT_NL,NODLT_NL,
+     .                                 NLOC_DMG%POSI,NLOC_DMG%L_NLOC,NTHREAD )
+                  ! Non-local nodal timestep (only with /DT/NODA)
                   IF (NODADT > 0) THEN
-                    CALL ASSPAR_SUB_POFF(NLOC_DMG%STIFNL,NODFT_NL,NODLT_NL,
-     .                                   NLOC_DMG%POSI,NLOC_DMG%L_NLOC,NTHREAD )
                     CALL NLOCAL_DTNODA(NODFT_NL,NODLT_NL,NLOC_DMG,DTNOD_NLOCAL,DT2T)
                   ENDIF
                 ENDIF
@@ -4872,10 +4875,11 @@ C------------------------
                   NODLT_NL   = (ITSK+1)*NLOC_DMG%NNOD/NTHREAD
                   CALL ASSPAR_SUB(NLOC_DMG%FNL(:,1) ,NLOC_DMG%FSKY,NLOC_DMG%ADDCNE,NODFT_NL     ,
      .                            NODLT_NL    ,NLOC_DMG%POSI  ,NLOC_DMG%NNOD, NLOC_DMG%L_NLOC)
-                  ! Non-local nodal stiffness
+                  ! Non-local nodal stiffness: always assembled (see POFF path).
+                  CALL ASSPAR_SUB(NLOC_DMG%STIFNL(:,1),NLOC_DMG%STSKY,NLOC_DMG%ADDCNE,NODFT_NL,
+     .                            NODLT_NL,NLOC_DMG%POSI,NLOC_DMG%NNOD,NLOC_DMG%L_NLOC)
+                  ! Non-local nodal timestep (only with /DT/NODA)
                   IF (NODADT > 0) THEN
-                    CALL ASSPAR_SUB(NLOC_DMG%STIFNL(:,1),NLOC_DMG%STSKY,NLOC_DMG%ADDCNE,NODFT_NL,
-     .                              NODLT_NL,NLOC_DMG%POSI,NLOC_DMG%NNOD,NLOC_DMG%L_NLOC)
                     CALL NLOCAL_DTNODA(NODFT_NL,NODLT_NL,NLOC_DMG,DTNOD_NLOCAL,DT2T)
                   ENDIF
                 ENDIF
@@ -6934,6 +6938,11 @@ c
                   NODFT_NL   = 1+ ITSK*NLOC_DMG%NNOD/NTHREAD
                   NODLT_NL   = (ITSK+1)*NLOC_DMG%NNOD/NTHREAD
                   CALL NLOCAL_ACC(NLOC_DMG, NODFT_NL ,NODLT_NL)
+                  ! Zero-flux crack BC: freeze fully-eroded (orphan) non-local
+                  ! d.o.fs now that STIFNL is fully assembled and (for MPI)
+                  ! frontier-exchanged, and re-seed the STIFNL floor for the
+                  ! next cycle.
+                  CALL NLOCAL_FREEZE_ORPHAN(NLOC_DMG, NODFT_NL ,NODLT_NL)
                 ENDIF
 c
                 IF (ICRACK3D > 0) THEN

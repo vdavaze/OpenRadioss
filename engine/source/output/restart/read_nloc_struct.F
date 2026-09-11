@@ -133,24 +133,17 @@ c
         IF (IPARIT == 1) THEN 
           call my_alloc(NLOC_DMG%FNL, L_NLOC, 1, "NLOC_DMG%FNL")
           NLOC_DMG%FNL(1:L_NLOC,1)    = ZERO
-          ! Non-local nodal stiffness
-          IF (NODADT > 0) THEN
-            call my_alloc(NLOC_DMG%STIFNL, L_NLOC, 1, "NLOC_DMG%STIFNL")
-            NLOC_DMG%STIFNL(1:L_NLOC,1) = ZERO
-          ELSE
-            call my_alloc(NLOC_DMG%STIFNL, 0, 0, "NLOC_DMG%STIFNL")
-          ENDIF
+          ! Non-local nodal stiffness (always allocated: the zero-flux crack BC
+          ! needs it for orphan-d.o.f detection even without /DT/NODA)
+          call my_alloc(NLOC_DMG%STIFNL, L_NLOC, 1, "NLOC_DMG%STIFNL")
+          NLOC_DMG%STIFNL(1:L_NLOC,1) = ZERO
         ! If engine PARITH/OFF
         ELSE
           call my_alloc(NLOC_DMG%FNL, L_NLOC, NTHREAD, "NLOC_DMG%FNL")
           NLOC_DMG%FNL(1:L_NLOC,1:NTHREAD) = ZERO
-          ! Non-local nodal stiffness
-          IF (NODADT > 0) THEN
-            call my_alloc(NLOC_DMG%STIFNL, L_NLOC, NTHREAD, "NLOC_DMG%STIFNL")
-            NLOC_DMG%STIFNL(1:L_NLOC,1:NTHREAD) = ZERO
-          ELSE
-            call my_alloc(NLOC_DMG%STIFNL, 0, 0, "NLOC_DMG%STIFNL")
-          ENDIF
+          ! Non-local nodal stiffness (always allocated, see above)
+          call my_alloc(NLOC_DMG%STIFNL, L_NLOC, NTHREAD, "NLOC_DMG%STIFNL")
+          NLOC_DMG%STIFNL(1:L_NLOC,1:NTHREAD) = ZERO
         ENDIF
 c
         CALL READ_DB(NLOC_DMG%DENS,MATSIZE)
@@ -191,13 +184,10 @@ c
           call my_alloc(NLOC_DMG%FSKY, NLOC_DMG%ADDCNE(NNOD+1), NDDMAX, "NLOC_DMG%FSKY")
           NLOC_DMG%FSKY(1:NLOC_DMG%ADDCNE(NNOD+1),1:NDDMAX) = ZERO
 c
-          ! STSKY vector
-          IF (NODADT > 0) THEN
-            call my_alloc(NLOC_DMG%STSKY, NLOC_DMG%ADDCNE(NNOD+1), NDDMAX, "NLOC_DMG%STSKY")
-            NLOC_DMG%STSKY(1:NLOC_DMG%ADDCNE(NNOD+1),1:NDDMAX) = ZERO
-          ELSE
-            call my_alloc(NLOC_DMG%STSKY, 0, 0, "NLOC_DMG%STSKY")
-          ENDIF
+          ! STSKY vector (always allocated: needed for orphan-d.o.f detection
+          ! under the zero-flux crack BC even without /DT/NODA)
+          call my_alloc(NLOC_DMG%STSKY, NLOC_DMG%ADDCNE(NNOD+1), NDDMAX, "NLOC_DMG%STSKY")
+          NLOC_DMG%STSKY(1:NLOC_DMG%ADDCNE(NNOD+1),1:NDDMAX) = ZERO
 c
         ENDIF
 c        

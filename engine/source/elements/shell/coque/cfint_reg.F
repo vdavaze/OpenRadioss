@@ -81,7 +81,7 @@ C-----------------------------------------------
      .    L2,NTN,XI,NTVAR,ZETA,VOL4,RD1,RD2,RD3,RD4,
      . B1,B2,B3,B4,SSPNL,NTH1,NTH2,BTH1,BTH2,K1,K2,K12,
      . DTNL_TH,DTNL,LE_MAX,MAXSTIF,DTNOD,DT2P,ALPHA,
-     . RM1,RM2,RM3,RM4,FABS1,FABS2,FABS3,FABS4,L2VOL,NV,WFK
+     . L2VOL,NV,WFK
       my_real, DIMENSION(:,:), ALLOCATABLE :: 
      . F1,F2,F3,F4,STI1,STI2,STI3,STI4
       my_real, DIMENSION(:) ,ALLOCATABLE   :: 
@@ -110,18 +110,15 @@ C=======================================================================
       call my_alloc(F2, NEL, NDDL, "F2")
       call my_alloc(F3, NEL, NDDL, "F3")
       call my_alloc(F4, NEL, NDDL, "F4")
-      ! Only for nodal timestep
-      IF (NODADT > 0) THEN
-        ! Nodal stiffness
-        call my_alloc(STI1, NEL, NDDL, "STI1")
-        call my_alloc(STI2, NEL, NDDL, "STI2")
-        call my_alloc(STI3, NEL, NDDL, "STI3")
-        call my_alloc(STI4, NEL, NDDL, "STI4")
-        ! Non-local mass
-        MASS  => NLOC_DMG%MASS(1:L_NLOC)
-        ! Initial non-local mass
-        MASS0 => NLOC_DMG%MASS0(1:L_NLOC)
-      ENDIF
+      ! Nodal stiffness
+      call my_alloc(STI1, NEL, NDDL, "STI1")
+      call my_alloc(STI2, NEL, NDDL, "STI2")
+      call my_alloc(STI3, NEL, NDDL, "STI3")
+      call my_alloc(STI4, NEL, NDDL, "STI4")
+      ! Non-local mass
+      MASS  => NLOC_DMG%MASS(1:L_NLOC)
+      ! Initial non-local mass
+      MASS0 => NLOC_DMG%MASS0(1:L_NLOC)
       call my_alloc(BTB11, NEL, "BTB11")
       call my_alloc(BTB12, NEL, "BTB12")
       call my_alloc(BTB22, NEL, "BTB22")
@@ -438,42 +435,31 @@ c
 c
           ! Degradation weight, clamped to [0,1]: OFF may legitimately take
           ! values outside {0,1} (e.g. 2 = deactivated) which would otherwise
-          ! turn the blend below into an unstable extrapolation.
+          ! turn the update below into an unstable extrapolation.
           ALPHA = MIN(ONE, MAX(ZERO, OFF(I)))
 c
-          ! Mass-ratio factor (1 when no nodal timestep); guarded denominator
-          RM1 = ONE
-          RM2 = ONE
-          RM3 = ONE
-          RM4 = ONE
-          IF (NODADT > 0) THEN
-            RM1 = SQRT(MASS(POS1(I)+K-1)/MAX(MASS0(POS1(I)+K-1),EM20))
-            RM2 = SQRT(MASS(POS2(I)+K-1)/MAX(MASS0(POS2(I)+K-1),EM20))
-            RM3 = SQRT(MASS(POS3(I)+K-1)/MAX(MASS0(POS3(I)+K-1),EM20))
-            RM4 = SQRT(MASS(POS4(I)+K-1)/MAX(MASS0(POS4(I)+K-1),EM20))
-          ENDIF
+          ! --- Option (A): zero-flux (homogeneous Neumann) crack face --------
+          ! A failing element simply withdraws its (degradation-weighted)
+          ! non-local contribution; NO absorbing dashpot is applied. When ALPHA
+          ! reaches 0 the element becomes fully transparent, which is exactly
+          ! the zero-flux condition the micromorphic field should see at an
+          ! open crack. Any d.o.f that loses ALL its live supporting elements is
+          ! detected as an orphan (assembled STIFNL at the EM20 floor) and
+          ! frozen in NLOCAL_FREEZE_ORPHAN, which suppresses the zero-energy
+          ! drift the dashpot used to damp -- without bleeding energy out of the
+          ! non-local field. This holds for both /DT/NODA and the constant/
+          ! element timestep (NODADT==0).
+          F1(I,K) = ALPHA*F1(I,K)
+          F2(I,K) = ALPHA*F2(I,K)
+          F3(I,K) = ALPHA*F3(I,K)
+          F4(I,K) = ALPHA*F4(I,K)
 c
-          ! Non-local absorbing (dashpot / first-order radiation) forces on the
-          ! failing boundary: impedance ZETA*SSPNL times mid-step velocity.
-          FABS1 = WF(K,NDDL)*RM1*ZETA*SSPNL*HALF*(VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*SQRT(AREA0(I))*THK0(I)
-          FABS2 = WF(K,NDDL)*RM2*ZETA*SSPNL*HALF*(VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*SQRT(AREA0(I))*THK0(I)
-          FABS3 = WF(K,NDDL)*RM3*ZETA*SSPNL*HALF*(VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*SQRT(AREA0(I))*THK0(I)
-          FABS4 = WF(K,NDDL)*RM4*ZETA*SSPNL*HALF*(VNL(POS4(I)+K-1)+VNL0(POS4(I)+K-1))*SQRT(AREA0(I))*THK0(I)
-c
-          ! Blend intact response with absorbing response by the degradation weight
-          F1(I,K) = ALPHA*F1(I,K) + (ONE - ALPHA)*FABS1
-          F2(I,K) = ALPHA*F2(I,K) + (ONE - ALPHA)*FABS2
-          F3(I,K) = ALPHA*F3(I,K) + (ONE - ALPHA)*FABS3
-          F4(I,K) = ALPHA*F4(I,K) + (ONE - ALPHA)*FABS4
-c
-          ! Degrade nodal stiffness consistently with the force blend so the
-          ! nodal timestep estimate stays conservative through failure.
-          IF (NODADT > 0) THEN
-            STI1(I,K) = ALPHA*STI1(I,K) + (ONE - ALPHA)*EM20
-            STI2(I,K) = ALPHA*STI2(I,K) + (ONE - ALPHA)*EM20
-            STI3(I,K) = ALPHA*STI3(I,K) + (ONE - ALPHA)*EM20
-            STI4(I,K) = ALPHA*STI4(I,K) + (ONE - ALPHA)*EM20
-          ENDIF
+          ! Degrade nodal stiffness but keep the EM20 floor so the orphan
+          ! detector can recognise a fully-failed d.o.f.
+          STI1(I,K) = MAX(ALPHA*STI1(I,K),EM20)
+          STI2(I,K) = MAX(ALPHA*STI2(I,K),EM20)
+          STI3(I,K) = MAX(ALPHA*STI3(I,K),EM20)
+          STI4(I,K) = MAX(ALPHA*STI4(I,K),EM20)
         ENDDO
       ENDDO
 c      
@@ -485,7 +471,7 @@ c
       IF (IPARIT == 0) THEN 
         ! Recovering non-local internal forces
         FNL => NLOC_DMG%FNL(1:L_NLOC,ITASK+1)                       ! Non-local forces
-        IF (NODADT > 0) STIFNL => NLOC_DMG%STIFNL(1:L_NLOC,ITASK+1) ! Non-local equivalent nodal stiffness
+        STIFNL => NLOC_DMG%STIFNL(1:L_NLOC,ITASK+1)                 ! Non-local equivalent nodal stiffness
         ! Loop over elements
         DO I=1,NEL
           ! Loop over non-local degrees of freedom
@@ -496,15 +482,14 @@ c
             FNL(POS2(I)+K-1) = FNL(POS2(I)+K-1) - F2(I,K)
             FNL(POS3(I)+K-1) = FNL(POS3(I)+K-1) - F3(I,K)
             FNL(POS4(I)+K-1) = FNL(POS4(I)+K-1) - F4(I,K)
-            IF (NODADT > 0) THEN
-              ! Spectral radius of stiffness matrix
-              MAXSTIF = MAX(STI1(I,K),STI2(I,K),STI3(I,K),STI4(I,K))
-              ! Computing nodal stiffness
-              STIFNL(POS1(I)+K-1) = STIFNL(POS1(I)+K-1) + MAXSTIF
-              STIFNL(POS2(I)+K-1) = STIFNL(POS2(I)+K-1) + MAXSTIF
-              STIFNL(POS3(I)+K-1) = STIFNL(POS3(I)+K-1) + MAXSTIF
-              STIFNL(POS4(I)+K-1) = STIFNL(POS4(I)+K-1) + MAXSTIF
-            ENDIF
+            ! Spectral radius of stiffness matrix (always accumulated: the
+            ! zero-flux orphan detector needs STIFNL even without /DT/NODA)
+            MAXSTIF = MAX(STI1(I,K),STI2(I,K),STI3(I,K),STI4(I,K))
+            ! Computing nodal stiffness
+            STIFNL(POS1(I)+K-1) = STIFNL(POS1(I)+K-1) + MAXSTIF
+            STIFNL(POS2(I)+K-1) = STIFNL(POS2(I)+K-1) + MAXSTIF
+            STIFNL(POS3(I)+K-1) = STIFNL(POS3(I)+K-1) + MAXSTIF
+            STIFNL(POS4(I)+K-1) = STIFNL(POS4(I)+K-1) + MAXSTIF
           ENDDO
         ENDDO
 c
@@ -517,26 +502,24 @@ c
           DO I=1,NEL
             II  = I + NFT
 c
-            ! Spectral radius of stiffness matrix
-            IF (NODADT > 0) THEN
-              MAXSTIF = MAX(STI1(I,J),STI2(I,J),STI3(I,J),STI4(I,J))
-            ENDIF
+            ! Spectral radius of stiffness matrix (always accumulated, see above)
+            MAXSTIF = MAX(STI1(I,J),STI2(I,J),STI3(I,J),STI4(I,J))
 c
             K = NLOC_DMG%IADC(1,II)
             NLOC_DMG%FSKY(K,J) = -F1(I,J)
-            IF (NODADT > 0) NLOC_DMG%STSKY(K,J) = MAXSTIF
+            NLOC_DMG%STSKY(K,J) = MAXSTIF
 c
             K = NLOC_DMG%IADC(2,II)
             NLOC_DMG%FSKY(K,J) = -F2(I,J)
-            IF (NODADT > 0) NLOC_DMG%STSKY(K,J) = MAXSTIF
+            NLOC_DMG%STSKY(K,J) = MAXSTIF
 c
             K = NLOC_DMG%IADC(3,II)
             NLOC_DMG%FSKY(K,J) = -F3(I,J)
-            IF (NODADT > 0) NLOC_DMG%STSKY(K,J) = MAXSTIF
+            NLOC_DMG%STSKY(K,J) = MAXSTIF
 c
             K = NLOC_DMG%IADC(4,II)
             NLOC_DMG%FSKY(K,J) = -F4(I,J)
-            IF (NODADT > 0) NLOC_DMG%STSKY(K,J) = MAXSTIF
+            NLOC_DMG%STSKY(K,J) = MAXSTIF
 c
           ENDDO
 c

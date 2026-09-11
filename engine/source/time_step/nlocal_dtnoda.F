@@ -125,16 +125,6 @@ C
         ENDIF
 #include "lockoff.inc"
 C       
-        ! Resetting non-local nodal stiffness
-        DO N = NODFT,NODLT
-          ! Position of the first additional dof
-          NPOS = NLOC_DMG%POSI(N)
-          ! Number of additional degrees of freedom
-          NDDL = NLOC_DMG%POSI(N+1) - NPOS
-          ! Resetting nodal stiffness
-          STIFN(NPOS:NPOS+NDDL-1) = EM20
-        ENDDO
-C
         ! Deallocation
         IF (ALLOCATED(DTN)) call my_dealloc(DTN)
 C
