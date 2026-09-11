@@ -114,7 +114,7 @@
 !-----------------------------------------------
           integer :: i,ii,k,n1,n2,n3,n4,n5,n6,l_nloc
           integer, dimension(:), allocatable :: pos1,pos2,pos3,pos4,pos5,pos6
-          real(kind = WP) :: l2,ntn_unl,ntn_vnl,xi,ntvar,a,b1,b2,b3,b4,b5,b6
+          real(kind = WP) :: l2,xi,ntvar,vol6,rd1,rd2,rd3,rd4,rd5,rd6,b1,b2,b3,b4,b5,b6
           real(kind = WP) :: zeta,sspnl,dtnl,le_max,maxstif,ntn
           real(kind = WP) :: alpha,rm1,rm2,rm3,rm4,rm5,rm6
           real(kind = WP) :: fabs1,fabs2,fabs3,fabs4,fabs5,fabs6
@@ -269,21 +269,6 @@
             if (off(i) /= zero) then
 !
               !< Computing the product NtN*UNL
-              ntn_unl = (unl(pos1(i)) + unl(pos2(i)) + unl(pos3(i))                &
-                + unl(pos4(i)) + unl(pos5(i)) + unl(pos6(i))) / ntn
-!
-              !< Computing the product NtN*VNL
-              ntn_vnl = (vnl(pos1(i)) + vnl(pos2(i)) + vnl(pos3(i))                &
-                + vnl(pos4(i)) + vnl(pos5(i)) + vnl(pos6(i))) / ntn
-              if (nodadt > 0) then
-                ntn_vnl = min(sqrt(mass(pos1(i))/mass0(pos1(i))),                  &
-                  sqrt(mass(pos2(i))/mass0(pos2(i))),                  &
-                  sqrt(mass(pos3(i))/mass0(pos3(i))),                  &
-                  sqrt(mass(pos4(i))/mass0(pos4(i))),                  &
-                  sqrt(mass(pos5(i))/mass0(pos5(i))),                  &
-                  sqrt(mass(pos6(i))/mass0(pos6(i))))*ntn_vnl
-              endif
-!
               !< Computation of the product LEN**2 * BtxB
               b1 = l2 * vol(i) * ( btb11(i)*unl(pos1(i)) + btb12(i)*unl(pos2(i))   &
                 + btb13(i)*unl(pos3(i)) + btb14(i)*unl(pos4(i))   &
@@ -310,21 +295,42 @@
                 + btb56(i)*unl(pos5(i)) + btb66(i)*unl(pos6(i)) )
 !
               !< Multiplication by the volume of the element (and damping parameter XI)
-              ntn_unl = ntn_unl * vol(i)
-              ntn_vnl = ntn_vnl * xi * vol(i)
+              !< Source term (element-constant local variable), diagonally lumped
+              vol6  = vol(i)*one_over_6
+              ntvar = var_reg(i)*vol6
 !
-              !< Introducing the internal variable to be regularized
-              ntvar   = var_reg(i)*one_over_6* vol(i)
+              !< Diagonally-lumped (row-sum) reaction (NtN*UNL) and damping (NtN*VNL):
+              !< each node depends on its OWN d.o.f (weight VOL/6), consistently with
+              !< the diagonally-lumped source term above. Replaces the former rank-1
+              !< element-average (Sum/36), which smeared the reaction over the whole
+              !< element (extra numerical diffusion on top of the physical internal
+              !< length) and left the checkerboard velocity modes undamped.
+              rd1 = one
+              rd2 = one
+              rd3 = one
+              rd4 = one
+              rd5 = one
+              rd6 = one
+              !< Added-mass ratio scaling of the damping under nodal timestep
+              if (nodadt > 0) then
+                rd1 = sqrt(mass(pos1(i))/max(mass0(pos1(i)),em20))
+                rd2 = sqrt(mass(pos2(i))/max(mass0(pos2(i)),em20))
+                rd3 = sqrt(mass(pos3(i))/max(mass0(pos3(i)),em20))
+                rd4 = sqrt(mass(pos4(i))/max(mass0(pos4(i)),em20))
+                rd5 = sqrt(mass(pos5(i))/max(mass0(pos5(i)),em20))
+                rd6 = sqrt(mass(pos6(i))/max(mass0(pos6(i)),em20))
+              endif
 !
-              !< Computing the elementary non-local forces
-              a = ntn_unl + ntn_vnl - ntvar
-              f1(i) = a + b1
-              f2(i) = a + b2
-              f3(i) = a + b3
-              f4(i) = a + b4
-              f5(i) = a + b5
-              f6(i) = a + b6
+              !< Elementary non-local forces: reaction + damping - source + diffusion
+              f1(i) = unl(pos1(i))*vol6 + xi*vol6*rd1*vnl(pos1(i)) - ntvar + b1
+              f2(i) = unl(pos2(i))*vol6 + xi*vol6*rd2*vnl(pos2(i)) - ntvar + b2
+              f3(i) = unl(pos3(i))*vol6 + xi*vol6*rd3*vnl(pos3(i)) - ntvar + b3
+              f4(i) = unl(pos4(i))*vol6 + xi*vol6*rd4*vnl(pos4(i)) - ntvar + b4
+              f5(i) = unl(pos5(i))*vol6 + xi*vol6*rd5*vnl(pos5(i)) - ntvar + b5
+              f6(i) = unl(pos6(i))*vol6 + xi*vol6*rd6*vnl(pos6(i)) - ntvar + b6
 !
+              ! Nodal equivalent stiffness (row-sum 6/36 = 1/6 matches the diagonal
+              ! lump above, so this stays a valid conservative dt estimate).
               ! Computing nodal equivalent stiffness
               if (nodadt > 0) then
                 sti1(i) = (abs(l2*btb11(i) + one/ntn) + abs(l2*btb12(i) + one/ntn) &

@@ -72,7 +72,7 @@ C-----------------------------------------------
       INTEGER :: IMAT,NDOF,L_NLOC,N1,N2,N3,K,I,NDNOD
       INTEGER, DIMENSION(NEL) :: POS1,POS2,POS3
       my_real
-     .   LE_MIN,LEN,DAMP,DENS,NTN_UNL,NTN_VNL,
+     .   LE_MIN,LEN,DAMP,DENS,VOL3,
      .   NTVAR,Z01(11,11),WF1(11,11),ZN1(12,11),B1,B2,B3,
      .   NTH1,NTH2,BTH1,BTH2,K1,K12,K2,SSPNL,LE_MAX
       my_real, DIMENSION(:,:), ALLOCATABLE :: VAR_REG,VPRED
@@ -424,16 +424,17 @@ c
      .                                         + BTB23(I)*UNL(POS3(I)+K-1))        
                B3 = ((LEN**2)/VOLS(I))*WF1(K,NDOF)*(BTB13(I)*UNL(POS1(I)+K-1) + BTB23(I)*UNL(POS2(I)+K-1) 
      .                                         + BTB33(I)*UNL(POS3(I)+K-1))    
-               ! Computing the product NtN*UNL
-               NTN_UNL = ((UNL(POS1(I)+K-1) + UNL(POS2(I)+K-1) + UNL(POS3(I)+K-1))*THIRD*THIRD)*VOLS(I)*WF1(K,NDOF)
-               ! Computing the product DAMP*NtN*VNL!
-               NTN_VNL = ((VNL(POS1(I)+K-1) + VNL(POS2(I)+K-1) + VNL(POS3(I)+K-1))*THIRD*THIRD)*DAMP*VOLS(I)*WF1(K,NDOF)
+               ! Diagonally-lumped (row-sum) reaction and damping: each node uses its
+               ! OWN d.o.f (weight VOL/3), consistently with the diagonally-lumped source
+               ! term (NTVAR). Matches the engine operator (c3fint_reg) so the static
+               ! initialization equilibrates the same discrete system solved at run time.
+               VOL3    = THIRD*VOLS(I)*WF1(K,NDOF)
                ! Introducing the internal variable to be regularized
-               NTVAR   = VAR_REG(I,K)*THIRD*VOLS(I)*WF1(K,NDOF)
+               NTVAR   = VAR_REG(I,K)*VOL3
                !Computing the elementary non-local forces
-               FNL(POS1(I)+K-1) = FNL(POS1(I)+K-1) - (NTN_UNL + NTN_VNL - NTVAR + B1)
-               FNL(POS2(I)+K-1) = FNL(POS2(I)+K-1) - (NTN_UNL + NTN_VNL - NTVAR + B2)
-               FNL(POS3(I)+K-1) = FNL(POS3(I)+K-1) - (NTN_UNL + NTN_VNL - NTVAR + B3)
+               FNL(POS1(I)+K-1) = FNL(POS1(I)+K-1) - (UNL(POS1(I)+K-1)*VOL3 + DAMP*VOL3*VNL(POS1(I)+K-1) - NTVAR + B1)
+               FNL(POS2(I)+K-1) = FNL(POS2(I)+K-1) - (UNL(POS2(I)+K-1)*VOL3 + DAMP*VOL3*VNL(POS2(I)+K-1) - NTVAR + B2)
+               FNL(POS3(I)+K-1) = FNL(POS3(I)+K-1) - (UNL(POS3(I)+K-1)*VOL3 + DAMP*VOL3*VNL(POS3(I)+K-1) - NTVAR + B3)
              ELSE
                ! Non-local absorbing forces
                FNL(POS1(I)+K-1) = FNL(POS1(I)+K-1) - 

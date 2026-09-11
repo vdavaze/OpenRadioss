@@ -72,7 +72,7 @@ C   L o c a l   V a r i a b l e s
 C-----------------------------------------------
       INTEGER I,II,K,NNOD,N1,N2,N3,N4,L_NLOC
       my_real 
-     .    L2,NTN,NTN_UNL,NTN_VNL,XI,NTVAR,A,
+     .    L2,NTN,XI,NTVAR,VOL4,RD1,RD2,RD3,RD4,
      . B1,B2,B3,B4,ZETA,SSPNL,DTNL,LE_MAX,MAXSTIF,ALPHA,
      . RM1,RM2,RM3,RM4,FABS1,FABS2,FABS3,FABS4
       my_real, DIMENSION(NEL) :: 
@@ -179,18 +179,6 @@ c
         ! If the element is not broken, normal computation
         IF (OFF(I)/=ZERO) THEN 
 c
-          ! Computing the product NtN*UNL
-          NTN_UNL = (UNL(POS1(I)) + UNL(POS2(I)) + UNL(POS3(I)) + UNL(POS4(I))) / NTN
-c        
-          ! Computing the product XDAMP*NtN*VNL
-          NTN_VNL = (VNL(POS1(I)) + VNL(POS2(I)) + VNL(POS3(I)) + VNL(POS4(I))) / NTN
-          IF (NODADT > 0) THEN 
-            NTN_VNL = MIN(SQRT(MASS(POS1(I))/MASS0(POS1(I))),
-     .                    SQRT(MASS(POS2(I))/MASS0(POS2(I))), 
-     .                    SQRT(MASS(POS3(I))/MASS0(POS3(I))), 
-     .                    SQRT(MASS(POS4(I))/MASS0(POS4(I))))*NTN_VNL
-          ENDIF
-c
           ! Computation of the product LEN**2 * BtxB
           B1 = L2 * VOL(I) * ( BTB11(I)*UNL(POS1(I)) + BTB12(I)*UNL(POS2(I)) 
      .       + BTB13(I)*UNL(POS3(I)) + BTB14(I)*UNL(POS4(I)))
@@ -204,20 +192,36 @@ c
           B4 = L2 * VOL(I) * ( BTB14(I)*UNL(POS1(I)) + BTB24(I)*UNL(POS2(I)) 
      .       + BTB34(I)*UNL(POS3(I)) + BTB44(I)*UNL(POS4(I)))  
 c
-          ! Multiplication by the volume of the element    
-          NTN_UNL = NTN_UNL * VOL(I)
-          NTN_VNL = NTN_VNL * XI * VOL(I)
+          ! Source term (element-constant local variable), diagonally lumped
+          VOL4  = VOL(I)*FOURTH
+          NTVAR = VAR_REG(I)*VOL4
 c
-          ! Introducing the internal variable to be regularized
-          NTVAR   = VAR_REG(I)*FOURTH* VOL(I)
+          ! Diagonally-lumped (row-sum) reaction (NtN*UNL) and damping (NtN*VNL):
+          ! each node depends on its OWN d.o.f (weight VOL/4), consistently with
+          ! the diagonally-lumped source term above. Replaces the former rank-1
+          ! element-average (Sum/16), which smeared the reaction over the whole
+          ! element (extra numerical diffusion on top of the physical internal
+          ! length) and left the checkerboard velocity modes undamped.
+          RD1 = ONE
+          RD2 = ONE
+          RD3 = ONE
+          RD4 = ONE
+          ! Added-mass ratio scaling of the damping under nodal timestep
+          IF (NODADT > 0) THEN 
+            RD1 = SQRT(MASS(POS1(I))/MAX(MASS0(POS1(I)),EM20))
+            RD2 = SQRT(MASS(POS2(I))/MAX(MASS0(POS2(I)),EM20))
+            RD3 = SQRT(MASS(POS3(I))/MAX(MASS0(POS3(I)),EM20))
+            RD4 = SQRT(MASS(POS4(I))/MAX(MASS0(POS4(I)),EM20))
+          ENDIF
 c
-          ! Computing the elementary non-local forces
-          A = NTN_UNL + NTN_VNL - NTVAR
-          F1(I) = A + B1
-          F2(I) = A + B2
-          F3(I) = A + B3
-          F4(I) = A + B4
+          ! Elementary non-local forces: reaction + damping - source + diffusion
+          F1(I) = UNL(POS1(I))*VOL4 + XI*VOL4*RD1*VNL(POS1(I)) - NTVAR + B1
+          F2(I) = UNL(POS2(I))*VOL4 + XI*VOL4*RD2*VNL(POS2(I)) - NTVAR + B2
+          F3(I) = UNL(POS3(I))*VOL4 + XI*VOL4*RD3*VNL(POS3(I)) - NTVAR + B3
+          F4(I) = UNL(POS4(I))*VOL4 + XI*VOL4*RD4*VNL(POS4(I)) - NTVAR + B4
 c
+          ! Nodal equivalent stiffness (row-sum 4/16 = 1/4 matches the diagonal
+          ! lump above, so this stays a valid conservative dt estimate).
           ! Computing nodal equivalent stiffness
           IF (NODADT > 0) THEN 
             STI1(I) = (ABS(L2*BTB11(I)  + ONE/NTN) + ABS(L2*BTB12(I)  + ONE/NTN) + ABS(L2*BTB13(I)  + ONE/NTN) +

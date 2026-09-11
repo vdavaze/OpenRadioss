@@ -84,7 +84,7 @@ C-----------------------------------------------
       INTEGER I,II,J,K,NNOD,N1,N2,N3,N4,N5,N6,
      .        L_NLOC,NDDL,NDNOD
       my_real 
-     . L2,NTN,NTN_UNL,NTN_VNL,XI,NTVAR,A,DTNL,LE_MAX,
+     . L2,NTN,XI,NTVAR,VOL6,RD1,RD2,RD3,RD4,RD5,RD6,DTNL,LE_MAX,
      . B1,B2,B3,B4,B5,B6,ZETA,SSPNL,MAXSTIF,
      . BTH1,BTH2,NTH1,NTH2,DT2P,DTNOD,K1,K2,K12,
      . DTNL_TH,ALPHA,
@@ -451,22 +451,6 @@ c
           ! If the element is not broken, normal computation
           IF (OFF(I) /= ZERO) THEN 
 c
-            ! Computing the product NtN*UNL
-            NTN_UNL = (UNL(POS1(I)+K-1) + UNL(POS2(I)+K-1) + UNL(POS3(I)+K-1) + UNL(POS4(I)+K-1)
-     .              +  UNL(POS5(I)+K-1) + UNL(POS6(I)+K-1)) / NTN
-c        
-            ! Computing the product XDAMP*NtN*VNL
-            NTN_VNL = (VNL(POS1(I)+K-1) + VNL(POS2(I)+K-1) + VNL(POS3(I)+K-1) + VNL(POS4(I)+K-1)
-     .              +  VNL(POS5(I)+K-1) + VNL(POS6(I)+K-1)) / NTN
-            IF (NODADT > 0) THEN 
-              NTN_VNL = MIN(SQRT(NLOC_DMG%MASS(POS1(I)+K-1)/NLOC_DMG%MASS0(POS1(I)+K-1)), 
-     .                      SQRT(NLOC_DMG%MASS(POS2(I)+K-1)/NLOC_DMG%MASS0(POS2(I)+K-1)), 
-     .                      SQRT(NLOC_DMG%MASS(POS3(I)+K-1)/NLOC_DMG%MASS0(POS3(I)+K-1)), 
-     .                      SQRT(NLOC_DMG%MASS(POS4(I)+K-1)/NLOC_DMG%MASS0(POS4(I)+K-1)),
-     .                      SQRT(NLOC_DMG%MASS(POS5(I)+K-1)/NLOC_DMG%MASS0(POS5(I)+K-1)), 
-     .                      SQRT(NLOC_DMG%MASS(POS6(I)+K-1)/NLOC_DMG%MASS0(POS6(I)+K-1)))*NTN_VNL
-            ENDIF
-c        
             ! Computation of the product LEN**2 * BtxB
             B1 = L2 * VOL(I) * WS(K,NLAY) *HALF * ( BTB11(I)*UNL(POS1(I)+K-1) + BTB12(I)*UNL(POS2(I)+K-1) 
      .                + BTB13(I)*UNL(POS3(I)+K-1) + BTB14(I)*UNL(POS4(I)+K-1) + BTB15(I)*UNL(POS5(I)+K-1)
@@ -493,20 +477,39 @@ c
      .                + BTB66(I)*UNL(POS6(I)+K-1) )
 c
             ! Multiplication by the volume of the element    
-            NTN_UNL = NTN_UNL * VOL(I) * WS(K,NLAY) * HALF
-            NTN_VNL = NTN_VNL * XI * VOL(I) * WS(K,NLAY) * HALF
+            ! Source term (element-constant local variable), diagonally lumped
+            VOL6  = VOL(I) * ONE_OVER_6 * WS(K,NLAY) * HALF
+            NTVAR = VAR_REG(I,K)*VOL6
 c
-            ! Introducing the internal variable to be regularized
-            NTVAR   = VAR_REG(I,K)*ONE_OVER_6* VOL(I) * WS(K,NLAY) * HALF
+            ! Diagonally-lumped (row-sum) reaction (NtN*UNL) and damping (NtN*VNL):
+            ! each node depends on its OWN in-plane d.o.f (weight VOL/6), consistently
+            ! with the diagonally-lumped source term above. Replaces the former rank-1
+            ! element-average (Sum/36), which smeared the reaction over the whole element
+            ! (extra numerical diffusion on top of the physical internal length) and left
+            ! the checkerboard velocity modes undamped.
+            RD1 = ONE
+            RD2 = ONE
+            RD3 = ONE
+            RD4 = ONE
+            RD5 = ONE
+            RD6 = ONE
+            ! Added-mass ratio scaling of the damping under nodal timestep
+            IF (NODADT > 0) THEN 
+              RD1 = SQRT(NLOC_DMG%MASS(POS1(I)+K-1)/MAX(NLOC_DMG%MASS0(POS1(I)+K-1),EM20))
+              RD2 = SQRT(NLOC_DMG%MASS(POS2(I)+K-1)/MAX(NLOC_DMG%MASS0(POS2(I)+K-1),EM20))
+              RD3 = SQRT(NLOC_DMG%MASS(POS3(I)+K-1)/MAX(NLOC_DMG%MASS0(POS3(I)+K-1),EM20))
+              RD4 = SQRT(NLOC_DMG%MASS(POS4(I)+K-1)/MAX(NLOC_DMG%MASS0(POS4(I)+K-1),EM20))
+              RD5 = SQRT(NLOC_DMG%MASS(POS5(I)+K-1)/MAX(NLOC_DMG%MASS0(POS5(I)+K-1),EM20))
+              RD6 = SQRT(NLOC_DMG%MASS(POS6(I)+K-1)/MAX(NLOC_DMG%MASS0(POS6(I)+K-1),EM20))
+            ENDIF
 c
-            ! Computing the elementary non-local forces
-            A = NTN_UNL + NTN_VNL - NTVAR
-            F1(I,K) = A + B1
-            F2(I,K) = A + B2
-            F3(I,K) = A + B3
-            F4(I,K) = A + B4
-            F5(I,K) = A + B5
-            F6(I,K) = A + B6
+            ! Elementary non-local forces: reaction + damping - source + diffusion
+            F1(I,K) = UNL(POS1(I)+K-1)*VOL6 + XI*VOL6*RD1*VNL(POS1(I)+K-1) - NTVAR + B1
+            F2(I,K) = UNL(POS2(I)+K-1)*VOL6 + XI*VOL6*RD2*VNL(POS2(I)+K-1) - NTVAR + B2
+            F3(I,K) = UNL(POS3(I)+K-1)*VOL6 + XI*VOL6*RD3*VNL(POS3(I)+K-1) - NTVAR + B3
+            F4(I,K) = UNL(POS4(I)+K-1)*VOL6 + XI*VOL6*RD4*VNL(POS4(I)+K-1) - NTVAR + B4
+            F5(I,K) = UNL(POS5(I)+K-1)*VOL6 + XI*VOL6*RD5*VNL(POS5(I)+K-1) - NTVAR + B5
+            F6(I,K) = UNL(POS6(I)+K-1)*VOL6 + XI*VOL6*RD6*VNL(POS6(I)+K-1) - NTVAR + B6
 c
             ! Computing nodal equivalent stiffness
             IF (NODADT > 0) THEN 
