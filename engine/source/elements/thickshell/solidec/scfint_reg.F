@@ -110,7 +110,9 @@ C-----------------------------------------------
      .   L2,NTN_UNL,NTN_VNL,XI,NTVAR,A,DTNL,LE_MAX,
      .   B1,B2,B3,B4,B5,B6,B7,B8,ZETA,SSPNL,MAXSTIF,
      .   BTH1,BTH2,NTH1,NTH2,DT2P,DTNOD,K1,K2,K12,
-     .   DTNL_TH,NTN
+     .   DTNL_TH,NTN,ALPHA,
+     .   RM1,RM2,RM3,RM4,RM5,RM6,RM7,RM8,
+     .   FABS1,FABS2,FABS3,FABS4,FABS5,FABS6,FABS7,FABS8
       my_real, DIMENSION(:) ,ALLOCATABLE   :: 
      .   BTB11,BTB12,BTB13,BTB14,BTB22,BTB23,BTB24,
      .   BTB33,BTB34,BTB44,LC,THK,LTHK
@@ -538,29 +540,16 @@ c
 c            
           ! If the element is broken, the non-local wave is absorbed  
           ELSE
-c
-            ! Initial element characteristic length
-            LC(I) = (VOL0(I)*WS(K,NLAY)*HALF)**THIRD  
-c
+            F1(I,K) = ZERO
+            F2(I,K) = ZERO
+            F3(I,K) = ZERO
+            F4(I,K) = ZERO
+            F5(I,K) = ZERO
+            F6(I,K) = ZERO
+            F7(I,K) = ZERO
+            F8(I,K) = ZERO
+            ! Intact nodal stiffness is meaningless for a broken element
             IF (NODA_DT > 0) THEN
-              ! Non-local absorbing forces
-              F1(I,K) = SQRT(MASS(POS1(I)+K-1)/MASS0(POS1(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F2(I,K) = SQRT(MASS(POS2(I)+K-1)/MASS0(POS2(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F3(I,K) = SQRT(MASS(POS3(I)+K-1)/MASS0(POS3(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F4(I,K) = SQRT(MASS(POS4(I)+K-1)/MASS0(POS4(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS4(I)+K-1)+VNL0(POS4(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F5(I,K) = SQRT(MASS(POS5(I)+K-1)/MASS0(POS5(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS5(I)+K-1)+VNL0(POS5(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F6(I,K) = SQRT(MASS(POS6(I)+K-1)/MASS0(POS6(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS6(I)+K-1)+VNL0(POS6(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F7(I,K) = SQRT(MASS(POS7(I)+K-1)/MASS0(POS7(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS7(I)+K-1)+VNL0(POS7(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F8(I,K) = SQRT(MASS(POS8(I)+K-1)/MASS0(POS8(I)+K-1))*ZETA*SSPNL*HALF*
-     .                       (VNL(POS8(I)+K-1)+VNL0(POS8(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              ! Computing nodal equivalent stiffness
               STI1(I,K) = EM20
               STI2(I,K) = EM20
               STI3(I,K) = EM20
@@ -569,17 +558,69 @@ c
               STI6(I,K) = EM20
               STI7(I,K) = EM20
               STI8(I,K) = EM20
-            ELSE
-              ! Non-local absorbing forces
-              F1(I,K) = ZETA*SSPNL*HALF*(VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F2(I,K) = ZETA*SSPNL*HALF*(VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F3(I,K) = ZETA*SSPNL*HALF*(VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F4(I,K) = ZETA*SSPNL*HALF*(VNL(POS4(I)+K-1)+VNL0(POS4(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F5(I,K) = ZETA*SSPNL*HALF*(VNL(POS5(I)+K-1)+VNL0(POS5(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F6(I,K) = ZETA*SSPNL*HALF*(VNL(POS6(I)+K-1)+VNL0(POS6(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F7(I,K) = ZETA*SSPNL*HALF*(VNL(POS7(I)+K-1)+VNL0(POS7(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
-              F8(I,K) = ZETA*SSPNL*HALF*(VNL(POS8(I)+K-1)+VNL0(POS8(I)+K-1))*(THREE/FOUR)*(LC(I)**2)          
             ENDIF
+          ENDIF
+c
+          ! Initial element characteristic length (needed for the absorbing forces)
+          LC(I) = (VOL0(I)*WS(K,NLAY)*HALF)**THIRD
+c
+          ! Degradation weight, clamped to [0,1]: OFF may legitimately take
+          ! values outside {0,1} which would otherwise turn the blend below
+          ! into an unstable extrapolation.
+          ALPHA = MIN(ONE, MAX(ZERO, OFF(I)))
+c
+          ! Mass-ratio factor (1 when no nodal timestep); guarded denominator
+          RM1 = ONE
+          RM2 = ONE
+          RM3 = ONE
+          RM4 = ONE
+          RM5 = ONE
+          RM6 = ONE
+          RM7 = ONE
+          RM8 = ONE
+          IF (NODA_DT > 0) THEN
+            RM1 = SQRT(MASS(POS1(I)+K-1)/MAX(MASS0(POS1(I)+K-1),EM20))
+            RM2 = SQRT(MASS(POS2(I)+K-1)/MAX(MASS0(POS2(I)+K-1),EM20))
+            RM3 = SQRT(MASS(POS3(I)+K-1)/MAX(MASS0(POS3(I)+K-1),EM20))
+            RM4 = SQRT(MASS(POS4(I)+K-1)/MAX(MASS0(POS4(I)+K-1),EM20))
+            RM5 = SQRT(MASS(POS5(I)+K-1)/MAX(MASS0(POS5(I)+K-1),EM20))
+            RM6 = SQRT(MASS(POS6(I)+K-1)/MAX(MASS0(POS6(I)+K-1),EM20))
+            RM7 = SQRT(MASS(POS7(I)+K-1)/MAX(MASS0(POS7(I)+K-1),EM20))
+            RM8 = SQRT(MASS(POS8(I)+K-1)/MAX(MASS0(POS8(I)+K-1),EM20))
+          ENDIF
+c
+          ! Non-local absorbing (dashpot / first-order radiation) forces on the
+          ! failing boundary: impedance ZETA*SSPNL times mid-step velocity.
+          FABS1 = RM1*ZETA*SSPNL*HALF*(VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS2 = RM2*ZETA*SSPNL*HALF*(VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS3 = RM3*ZETA*SSPNL*HALF*(VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS4 = RM4*ZETA*SSPNL*HALF*(VNL(POS4(I)+K-1)+VNL0(POS4(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS5 = RM5*ZETA*SSPNL*HALF*(VNL(POS5(I)+K-1)+VNL0(POS5(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS6 = RM6*ZETA*SSPNL*HALF*(VNL(POS6(I)+K-1)+VNL0(POS6(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS7 = RM7*ZETA*SSPNL*HALF*(VNL(POS7(I)+K-1)+VNL0(POS7(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+          FABS8 = RM8*ZETA*SSPNL*HALF*(VNL(POS8(I)+K-1)+VNL0(POS8(I)+K-1))*(THREE/FOUR)*(LC(I)**2)
+c
+          ! Blend intact response with absorbing response by the degradation weight
+          F1(I,K) = ALPHA*F1(I,K) + (ONE - ALPHA)*FABS1
+          F2(I,K) = ALPHA*F2(I,K) + (ONE - ALPHA)*FABS2
+          F3(I,K) = ALPHA*F3(I,K) + (ONE - ALPHA)*FABS3
+          F4(I,K) = ALPHA*F4(I,K) + (ONE - ALPHA)*FABS4
+          F5(I,K) = ALPHA*F5(I,K) + (ONE - ALPHA)*FABS5
+          F6(I,K) = ALPHA*F6(I,K) + (ONE - ALPHA)*FABS6
+          F7(I,K) = ALPHA*F7(I,K) + (ONE - ALPHA)*FABS7
+          F8(I,K) = ALPHA*F8(I,K) + (ONE - ALPHA)*FABS8
+c
+          ! Degrade nodal stiffness consistently with the force blend so the
+          ! nodal timestep estimate stays conservative through failure.
+          IF (NODA_DT > 0) THEN
+            STI1(I,K) = ALPHA*STI1(I,K) + (ONE - ALPHA)*EM20
+            STI2(I,K) = ALPHA*STI2(I,K) + (ONE - ALPHA)*EM20
+            STI3(I,K) = ALPHA*STI3(I,K) + (ONE - ALPHA)*EM20
+            STI4(I,K) = ALPHA*STI4(I,K) + (ONE - ALPHA)*EM20
+            STI5(I,K) = ALPHA*STI5(I,K) + (ONE - ALPHA)*EM20
+            STI6(I,K) = ALPHA*STI6(I,K) + (ONE - ALPHA)*EM20
+            STI7(I,K) = ALPHA*STI7(I,K) + (ONE - ALPHA)*EM20
+            STI8(I,K) = ALPHA*STI8(I,K) + (ONE - ALPHA)*EM20
           ENDIF
         ENDDO
       ENDDO

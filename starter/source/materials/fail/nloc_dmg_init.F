@@ -915,7 +915,15 @@ C
             NLOC_DMG%DAMP(IMAT) = MAX(DAMP,ZERO)
           ENDIF
           ! Computation of the initial non-local sound-speed
-          SSPNL = SQRT((LEN**2 + (LE_MAX**2)/PI**2)/DENS)
+          ! The non-local field is a dispersive (Klein-Gordon) medium:
+          !   DENS*w**2 = LEN**2*k**2 + 1 , evaluated at k = PI/LE_MAX.
+          ! For the absorbing boundary condition, energy travels at the GROUP
+          ! velocity c_g = dw/dk, not the phase velocity c_p = w/k. The group
+          ! velocity absorbs the physically relevant (energy-carrying) part of
+          ! the outgoing non-local wave and is therefore used here:
+          !   c_g = PI*LEN**2 / SQRT(DENS*(PI**2*LEN**2 + LE_MAX**2))
+          ! (satisfies the identity c_p*c_g = LEN**2/DENS).
+          SSPNL = (PI*LEN**2)/MAX(SQRT(DENS*(PI**2*LEN**2 + LE_MAX**2)),EM20)
           IF ((SSPNL < NLOC_DMG%SSPNL(IMAT)).OR.(NLOC_DMG%SSPNL(IMAT) == ZERO)) THEN
             NLOC_DMG%SSPNL(IMAT) = MAX(SSPNL,ZERO)
           ENDIF

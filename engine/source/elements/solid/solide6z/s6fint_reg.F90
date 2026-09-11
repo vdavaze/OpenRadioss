@@ -116,6 +116,8 @@
           integer, dimension(:), allocatable :: pos1,pos2,pos3,pos4,pos5,pos6
           real(kind = WP) :: l2,ntn_unl,ntn_vnl,xi,ntvar,a,b1,b2,b3,b4,b5,b6
           real(kind = WP) :: zeta,sspnl,dtnl,le_max,maxstif,ntn
+          real(kind = WP) :: alpha,rm1,rm2,rm3,rm4,rm5,rm6
+          real(kind = WP) :: fabs1,fabs2,fabs3,fabs4,fabs5,fabs6
           real(kind=WP), dimension(:) ,allocatable ::                              &
             btb11,btb12,btb13,btb14,btb15,btb16,                                   &
             btb22,btb23,btb24,btb25,btb26,                                         &
@@ -347,46 +349,73 @@
 !
               !< If the element is broken, the non-local wave is absorbed
             else
-!
-              !< Initial element characteristic length
-              lc(i) = vol0(i)**third
-!
+              f1(i) = zero
+              f2(i) = zero
+              f3(i) = zero
+              f4(i) = zero
+              f5(i) = zero
+              f6(i) = zero
+              !< Intact nodal stiffness is meaningless for a broken element
               if (nodadt > 0) then
-                !< Non-local absorbing forces
-                f1(i) = sqrt(mass(pos1(i))/mass0(pos1(i)))*zeta*sspnl*half*        &
-                  (vnl(pos1(i))+vnl0(pos1(i)))*(two_third)*(lc(i)**2)
-                f2(i) = sqrt(mass(pos2(i))/mass0(pos2(i)))*zeta*sspnl*half*        &
-                  (vnl(pos2(i))+vnl0(pos2(i)))*(two_third)*(lc(i)**2)
-                f3(i) = sqrt(mass(pos3(i))/mass0(pos3(i)))*zeta*sspnl*half*        &
-                  (vnl(pos3(i))+vnl0(pos3(i)))*(two_third)*(lc(i)**2)
-                f4(i) = sqrt(mass(pos4(i))/mass0(pos4(i)))*zeta*sspnl*half*        &
-                  (vnl(pos4(i))+vnl0(pos4(i)))*(two_third)*(lc(i)**2)
-                f5(i) = sqrt(mass(pos5(i))/mass0(pos5(i)))*zeta*sspnl*half*        &
-                  (vnl(pos5(i))+vnl0(pos5(i)))*(two_third)*(lc(i)**2)
-                f6(i) = sqrt(mass(pos6(i))/mass0(pos6(i)))*zeta*sspnl*half*        &
-                  (vnl(pos6(i))+vnl0(pos6(i)))*(two_third)*(lc(i)**2)
-                !< Computing nodal equivalent stiffness
                 sti1(i) = em20
                 sti2(i) = em20
                 sti3(i) = em20
                 sti4(i) = em20
                 sti5(i) = em20
                 sti6(i) = em20
-              else
-                !< Non-local absorbing forces
-                f1(i) = zeta*sspnl*half*(vnl(pos1(i))+vnl0(pos1(i)))*              &
-                  (two_third)*(lc(i)**2)
-                f2(i) = zeta*sspnl*half*(vnl(pos2(i))+vnl0(pos2(i)))*              &
-                  (two_third)*(lc(i)**2)
-                f3(i) = zeta*sspnl*half*(vnl(pos3(i))+vnl0(pos3(i)))*              &
-                  (two_third)*(lc(i)**2)
-                f4(i) = zeta*sspnl*half*(vnl(pos4(i))+vnl0(pos4(i)))*              &
-                  (two_third)*(lc(i)**2)
-                f5(i) = zeta*sspnl*half*(vnl(pos5(i))+vnl0(pos5(i)))*              &
-                  (two_third)*(lc(i)**2)
-                f6(i) = zeta*sspnl*half*(vnl(pos6(i))+vnl0(pos6(i)))*              &
-                  (two_third)*(lc(i)**2)
               endif
+            endif
+!
+            !< Initial element characteristic length (needed for the absorbing forces)
+            lc(i) = vol0(i)**third
+!
+            !< Degradation weight, clamped to [0,1]: off may legitimately take
+            !< values outside {0,1} (e.g. 2 = deactivated) which would otherwise
+            !< turn the blend below into an unstable extrapolation.
+            alpha = min(one, max(zero, off(i)))
+!
+            !< Mass-ratio factor (1 when no nodal timestep); guarded denominator
+            rm1 = one
+            rm2 = one
+            rm3 = one
+            rm4 = one
+            rm5 = one
+            rm6 = one
+            if (nodadt > 0) then
+              rm1 = sqrt(mass(pos1(i))/max(mass0(pos1(i)),em20))
+              rm2 = sqrt(mass(pos2(i))/max(mass0(pos2(i)),em20))
+              rm3 = sqrt(mass(pos3(i))/max(mass0(pos3(i)),em20))
+              rm4 = sqrt(mass(pos4(i))/max(mass0(pos4(i)),em20))
+              rm5 = sqrt(mass(pos5(i))/max(mass0(pos5(i)),em20))
+              rm6 = sqrt(mass(pos6(i))/max(mass0(pos6(i)),em20))
+            endif
+!
+            !< Non-local absorbing (dashpot / first-order radiation) forces on the
+            !< failing boundary: impedance zeta*sspnl times mid-step velocity.
+            fabs1 = rm1*zeta*sspnl*half*(vnl(pos1(i))+vnl0(pos1(i)))*(two_third)*(lc(i)**2)
+            fabs2 = rm2*zeta*sspnl*half*(vnl(pos2(i))+vnl0(pos2(i)))*(two_third)*(lc(i)**2)
+            fabs3 = rm3*zeta*sspnl*half*(vnl(pos3(i))+vnl0(pos3(i)))*(two_third)*(lc(i)**2)
+            fabs4 = rm4*zeta*sspnl*half*(vnl(pos4(i))+vnl0(pos4(i)))*(two_third)*(lc(i)**2)
+            fabs5 = rm5*zeta*sspnl*half*(vnl(pos5(i))+vnl0(pos5(i)))*(two_third)*(lc(i)**2)
+            fabs6 = rm6*zeta*sspnl*half*(vnl(pos6(i))+vnl0(pos6(i)))*(two_third)*(lc(i)**2)
+!
+            !< Blend intact response with absorbing response by the degradation weight
+            f1(i) = alpha*f1(i) + (one - alpha)*fabs1
+            f2(i) = alpha*f2(i) + (one - alpha)*fabs2
+            f3(i) = alpha*f3(i) + (one - alpha)*fabs3
+            f4(i) = alpha*f4(i) + (one - alpha)*fabs4
+            f5(i) = alpha*f5(i) + (one - alpha)*fabs5
+            f6(i) = alpha*f6(i) + (one - alpha)*fabs6
+!
+            !< Degrade nodal stiffness consistently with the force blend so the
+            !< nodal timestep estimate stays conservative through failure.
+            if (nodadt > 0) then
+              sti1(i) = alpha*sti1(i) + (one - alpha)*em20
+              sti2(i) = alpha*sti2(i) + (one - alpha)*em20
+              sti3(i) = alpha*sti3(i) + (one - alpha)*em20
+              sti4(i) = alpha*sti4(i) + (one - alpha)*em20
+              sti5(i) = alpha*sti5(i) + (one - alpha)*em20
+              sti6(i) = alpha*sti6(i) + (one - alpha)*em20
             endif
           enddo
 !

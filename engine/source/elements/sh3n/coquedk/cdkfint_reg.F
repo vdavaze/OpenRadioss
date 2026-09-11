@@ -83,7 +83,8 @@ C-----------------------------------------------
      .  B1,B2,B3,ZETA,SSPNL,
      .  NTH1,NTH2,BTH1,BTH2,K1,K2,K12,
      .  NTN_VNL1,NTN_VNL2,NTN_VNL3,H(3),NTVAR1,NTVAR2,
-     .  NTVAR3,LE_MAX,MAXSTIF,DTNOD,DT2P
+     .  NTVAR3,LE_MAX,MAXSTIF,DTNOD,DT2P,ALPHA,
+     .  RM1,RM2,RM3,FABS1,FABS2,FABS3
       my_real, DIMENSION(:,:), ALLOCATABLE :: 
      .  F1,F2,F3,STI1,STI2,STI3
       my_real, DIMENSION(:) ,ALLOCATABLE   :: 
@@ -422,27 +423,52 @@ c
 c
           ! If the element is broken, the non-local wave is absorbed
           ELSE
-            IF (NODADT > 0) THEN 
-              ! Non-local absorbing forces
-              F1(I,K) = SQRT(MASS(POS1(I)+K-1)/MASS0(POS1(I)+K-1))*H(1)*WF(K,NDDL)*ZETA*SSPNL*
-     .                     HALF*(VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
-              F2(I,K) = SQRT(MASS(POS2(I)+K-1)/MASS0(POS2(I)+K-1))*H(2)*WF(K,NDDL)*ZETA*SSPNL*
-     .                     HALF*(VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I) 
-              F3(I,K) = SQRT(MASS(POS3(I)+K-1)/MASS0(POS3(I)+K-1))*H(3)*WF(K,NDDL)*ZETA*SSPNL*
-     .                     HALF*(VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
-              ! Computing nodal equivalent stiffness
+            F1(I,K) = ZERO
+            F2(I,K) = ZERO
+            F3(I,K) = ZERO
+            ! Intact nodal stiffness is meaningless for a broken element
+            IF (NODADT > 0) THEN
               STI1(I,K) = EM20
               STI2(I,K) = EM20
-              STI3(I,K) = EM20          
-            ELSE
-              ! Non-local absorbing forces
-              F1(I,K) = H(1)*WF(K,NDDL)*ZETA*SSPNL*HALF*(VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*
-     .                                    SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
-              F2(I,K) = H(2)*WF(K,NDDL)*ZETA*SSPNL*HALF*(VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*
-     .                                    SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I) 
-              F3(I,K) = H(3)*WF(K,NDDL)*ZETA*SSPNL*HALF*(VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*
-     .                                    SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
+              STI3(I,K) = EM20
             ENDIF
+          ENDIF
+c
+          ! Degradation weight, clamped to [0,1]: OFF may legitimately take
+          ! values outside {0,1} (e.g. 2 = deactivated) which would otherwise
+          ! turn the blend below into an unstable extrapolation.
+          ALPHA = MIN(ONE, MAX(ZERO, OFF(I)))
+c
+          ! Mass-ratio factor (1 when no nodal timestep); guarded denominator
+          RM1 = ONE
+          RM2 = ONE
+          RM3 = ONE
+          IF (NODADT > 0) THEN
+            RM1 = SQRT(MASS(POS1(I)+K-1)/MAX(MASS0(POS1(I)+K-1),EM20))
+            RM2 = SQRT(MASS(POS2(I)+K-1)/MAX(MASS0(POS2(I)+K-1),EM20))
+            RM3 = SQRT(MASS(POS3(I)+K-1)/MAX(MASS0(POS3(I)+K-1),EM20))
+          ENDIF
+c
+          ! Non-local absorbing (dashpot / first-order radiation) forces on the
+          ! failing boundary: impedance ZETA*SSPNL times mid-step velocity.
+          FABS1 = RM1*H(1)*WF(K,NDDL)*ZETA*SSPNL*HALF*(VNL(POS1(I)+K-1)+VNL0(POS1(I)+K-1))*
+     .                                    SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
+          FABS2 = RM2*H(2)*WF(K,NDDL)*ZETA*SSPNL*HALF*(VNL(POS2(I)+K-1)+VNL0(POS2(I)+K-1))*
+     .                                    SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
+          FABS3 = RM3*H(3)*WF(K,NDDL)*ZETA*SSPNL*HALF*(VNL(POS3(I)+K-1)+VNL0(POS3(I)+K-1))*
+     .                                    SQRT((FOUR/SQRT(THREE))*(AREA0(I)))*THK0(I)
+c
+          ! Blend intact response with absorbing response by the degradation weight
+          F1(I,K) = ALPHA*F1(I,K) + (ONE - ALPHA)*FABS1
+          F2(I,K) = ALPHA*F2(I,K) + (ONE - ALPHA)*FABS2
+          F3(I,K) = ALPHA*F3(I,K) + (ONE - ALPHA)*FABS3
+c
+          ! Degrade nodal stiffness consistently with the force blend so the
+          ! nodal timestep estimate stays conservative through failure.
+          IF (NODADT > 0) THEN
+            STI1(I,K) = ALPHA*STI1(I,K) + (ONE - ALPHA)*EM20
+            STI2(I,K) = ALPHA*STI2(I,K) + (ONE - ALPHA)*EM20
+            STI3(I,K) = ALPHA*STI3(I,K) + (ONE - ALPHA)*EM20
           ENDIF
         ENDDO
       ENDDO
